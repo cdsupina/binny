@@ -35,17 +35,52 @@ async def main():
         inventory_manager_system_prompt_path.read_text().strip()
     )
 
+    # Load mmc-searcher system prompt from file
+    mmc_searcher_system_prompt_path = (
+        Path(__file__).parent / "system_prompts/mmc_searcher_prompt.md"
+    )
+    mmc_searcher_system_prompt = mmc_searcher_system_prompt_path.read_text().strip()
+
     # Initialize Claude options
     options = ClaudeAgentOptions(
         model="haiku",
         system_prompt=binny_system_prompt,
         add_dirs=[inventory_dir],
-        allowed_tools=["mcp__excel__read_data_from_excel"],
+        allowed_tools=[
+            "mcp__excel__read_data_from_excel",
+            "mcp__mcmaster__mmc_get_specifications",
+            "mcp__mcmaster__mmc_get_price",
+            "mcp__mcmaster__mmc_get_status",
+            "mcp__mcmaster__mmc_login",
+            "mcp__mcmaster__mmc_remove_product",
+            "mcp__mcmaster__mmc_get_changes",
+            "mcp__mcmaster__mmc_add_product",
+            "mcp__mcmaster__mmc_get_description",
+            "mcp__mcmaster__mmc_logout",
+            "mcp__mcmaster__mmc_get_product",
+        ],
         agents={
             "part-namer": AgentDefinition(
                 description="An agent to generate names for parts.",
                 prompt=part_namer_system_prompt,
                 model="haiku",
+            ),
+            "mmc-searcher": AgentDefinition(
+                description="Use this agent for all McMaster-Carr catalog operations including searching for parts, retrieving part information and specifications, managing part subscriptions, and accessing the McMaster-Carr product database.",
+                prompt=mmc_searcher_system_prompt,
+                model="haiku",
+                tools=[
+                    "mcp__mcmaster__mmc_get_specifications",
+                    "mcp__mcmaster__mmc_get_price",
+                    "mcp__mcmaster__mmc_get_status",
+                    "mcp__mcmaster__mmc_login",
+                    "mcp__mcmaster__mmc_remove_product",
+                    "mcp__mcmaster__mmc_get_changes",
+                    "mcp__mcmaster__mmc_add_product",
+                    "mcp__mcmaster__mmc_get_description",
+                    "mcp__mcmaster__mmc_logout",
+                    "mcp__mcmaster__mmc_get_product",
+                ],
             ),
             "inventory-manager": AgentDefinition(
                 description="Use this agent to query, search, and report on inventory levels, stock counts, and item availability.",
@@ -55,7 +90,8 @@ async def main():
             ),
         },
         mcp_servers={
-            "excel": {"command": "uvx", "args": ["excel-mcp-server", "stdio"]}
+            "excel": {"command": "uvx", "args": ["excel-mcp-server", "stdio"]},
+            "mcmaster": {"type": "stdio", "command": "mmc-mcp", "args": []},
         },
         env={
             "MAX_THINKING_TOKENS": "1500",

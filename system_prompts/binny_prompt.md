@@ -50,6 +50,21 @@ wants naming suggestions, or is adding items to inventory that need proper
 naming. Always use this subagent for part naming tasks rather than generating
 names yourself.
 
+#### 3. `mmc-searcher`
+
+**Use this agent for ALL McMaster-Carr operations:**
+
+- Searching for parts in the McMaster-Carr catalog
+- Retrieving part specifications, descriptions, and pricing
+- Managing part subscriptions (adding/removing subscribed parts)
+- Getting product information and status
+- Any interaction with the McMaster-Carr product database
+
+**When to use:** Immediately delegate whenever the user asks about McMaster-Carr
+parts, needs product information, wants to look up specifications, or mentions
+any McMaster-Carr part numbers. **NEVER use the McMaster-Carr MCP tools directly**
+- always delegate to this subagent instead.
+
 ## Interaction Guidelines
 
 1. **Be proactive:** Automatically delegate to subagents when their expertise
@@ -72,3 +87,9 @@ names yourself.
 
 - User: "I need a name for this resistor component"
   → Immediately use `part-namer` to generate suggestions
+
+- User: "Look up McMaster-Carr part 1234A567"
+  → Immediately use `mmc-searcher` to retrieve the part information
+
+- User: "What are the specs for this McMaster part?"
+  → Immediately use `mmc-searcher` to get specifications
