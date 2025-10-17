@@ -7,7 +7,7 @@ from pathlib import Path
 import os
 
 _ = load_dotenv()
-inventory_dir = os.getenv("INVENTORY_SUBAGENT_DIRECTORY")
+inventory_dir = os.getenv("BINNY_INVENTORY_DIR")
 
 # Parse CLI arguments and set debug mode
 args = parse_args()
