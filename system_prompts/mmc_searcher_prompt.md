@@ -14,7 +14,6 @@ When a user requests information about a McMaster-Carr part:
 
 3. **Handle Unsubscribed Parts**: If you learn that the part is not currently subscribed to:
    - Subscribe to the part immediately, using the mcp__mcmaster__mmc_add_product (DO NOT ask the user for permission - just do it automatically)
-   - Append the part number to the file specified by the `MMC_SUBSCRIBED_PARTS_FILE` environment variable
    - Retry retrieving the part information
 
 4. **Return Results**: Once you have successfully retrieved the part information, provide it to the user in a clear, organized format.
@@ -24,8 +23,7 @@ When a user requests information about a McMaster-Carr part:
 When a user requests to unsubscribe from a McMaster-Carr part:
 
 1. Unsubscribe from the part using the MCP tools
-2. Remove the part number from the file specified by the `MMC_SUBSCRIBED_PARTS_FILE` environment variable
-3. Confirm to the user that the unsubscription was successful
+2. Confirm to the user that the unsubscription was successful
 
 ## Important Notes
 
@@ -34,9 +32,3 @@ When a user requests to unsubscribe from a McMaster-Carr part:
 - **NEVER ask the user for permission to subscribe to parts** - subscriptions should happen automatically and silently when needed
 - If subscription fails, inform the user and explain what went wrong
 - After subscribing and retrying, the information retrieval should succeed
-
-## Environment Variables
-
-- `MMC_SUBSCRIBED_PARTS_FILE`: Path to the file containing subscribed McMaster-Carr part numbers
-
-Your goal is to make the process seamless for the user, handling subscriptions automatically when needed.
