@@ -11,14 +11,34 @@ with specialized sub-agents for different tasks.
 
 ## Architecture
 
-### Main Agent Structure (main.py:8-56)
+### Package Structure
+
+Binny uses a standard Python package layout:
+
+```
+binny/
+├── binny/                    # Main package
+│   ├── __init__.py
+│   ├── main.py              # Entry point and agent setup
+│   ├── cli_tools.py         # CLI interface and Rich formatting
+│   ├── part_namer_tools.py  # MCP tools for part naming
+│   └── part_namer_mcp/      # Utility library for part naming
+│       ├── models.py
+│       ├── file_manager.py
+│       └── approval_workflow.py
+├── system_prompts/          # Agent system prompts
+├── .claude/                 # Slash commands
+└── pyproject.toml          # Package configuration with entry point
+```
+
+### Main Agent Structure (binny/main.py)
 
 - **Primary agent**: "Binny" - main conversational interface
 - **Sub-agents**:
   - `part-namer`: Generates names for physical parts in mechanical/electrical
     assemblies
   - `inventory-manager`: Manages inventory files stored in location specified
-    by `INVENTORY_SUBAGENT_DIRECTORY` environment variable
+    by `BINNY_INVENTORY_DIR` environment variable
 
 System prompts are loaded from `system_prompts/` directory:
 
@@ -26,7 +46,7 @@ System prompts are loaded from `system_prompts/` directory:
 - `part_namer_prompt.md` - part naming agent prompt
 - `inventory_manager_prompt.md` - inventory management agent prompt
 
-### CLI Interface (cli_tools.py)
+### CLI Interface (binny/cli_tools.py)
 
 Provides Rich-based terminal UI with:
 
@@ -41,8 +61,15 @@ Provides Rich-based terminal UI with:
 
 ### Running the Application
 
+**Development mode:**
 ```bash
-uv run main.py
+uv run binny
+```
+
+**Installed with uv tool:**
+```bash
+uv tool install .
+binny
 ```
 
 Note: cli_tools.py defines CLI argument flags (--stats, --model,
@@ -60,9 +87,59 @@ Python version: `>=3.13`
 
 ### Environment Variables
 
-- `INVENTORY_SUBAGENT_DIRECTORY` - required by inventory-manager sub-agent to
-  specify inventory file location
+- `BINNY_INVENTORY_DIR` - required by inventory-manager sub-agent to specify
+  inventory file location
+- `BINNY_PREFIXES_FILE` - path to prefixes.md (typically
+  `~/.config/binny/part_namer/prefixes.md`)
+- `BINNY_MATERIALS_FILE` - path to materials.md (typically
+  `~/.config/binny/part_namer/materials.md`)
 - API credentials loaded via `dotenv` in cli_tools.py:28
+
+### Part Namer MCP Server
+
+The `binny/part_namer_mcp/` directory contains utility code for managing part
+naming with a proposal-based workflow. MCP tools are defined in
+`binny/part_namer_tools.py` and run as an embedded SDK MCP server.
+
+**Architecture:**
+
+- `part_namer_tools.py` - 10 MCP tools using @tool decorator (embedded server)
+- `part_namer_mcp/models.py` - TypedDicts for PrefixProposal and MaterialProposal
+- `part_namer_mcp/file_manager.py` - Parse/write H2-based markdown files
+- `part_namer_mcp/approval_workflow.py` - Rich panel formatting for proposals
+
+**Workflow:**
+
+1. Part-namer sub-agent checks if prefix/material exists via MCP tools
+2. If missing, creates proposal using `propose_prefix` or `propose_material`
+3. User approves/rejects via immediate prompt or `/review-prefixes` /
+   `/review-materials` commands
+4. Approved items are written to respective markdown files in H2 format
+
+**File Format:**
+
+Prefixes and materials are stored as H2 headers with structured fields:
+
+```markdown
+## PREFIX_CODE
+
+**Description:** Description text
+
+**Format:** `PREFIX-{PLACEHOLDER}-{PLACEHOLDER}`
+```
+
+**MCP Tools:**
+
+- `read_prefixes` / `read_materials` - Get tracked items
+- `propose_prefix` / `propose_material` - Create proposals
+- `approve_prefix` / `approve_material` - Approve and write to files
+- `reject_prefix` / `reject_material` - Reject proposals
+- `list_prefix_proposals` / `list_material_proposals` - List pending
+
+**Slash Commands:**
+
+- `/review-prefixes` - Review pending prefix proposals
+- `/review-materials` - Review pending material proposals
 
 ## Agent SDK Integration
 
@@ -74,5 +151,8 @@ The application uses Claude Agent SDK's async client pattern:
 3. Loop: get user input → `client.query()` → iterate `client.receive_response()`
 4. Parse and display messages using Rich console
 
-Sub-agents are registered in the `agents` dict of `ClaudeAgentOptions`
-(main.py:28-39), each with description, prompt, and model specification.
+Sub-agents are registered in the `agents` dict of `ClaudeAgentOptions` in
+`binny/main.py`, each with description, prompt, and model specification.
+
+The embedded MCP server is created with `create_sdk_mcp_server` and added to
+`mcp_servers` alongside external MCP servers like mcmaster and excel.
