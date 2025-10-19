@@ -14,9 +14,10 @@ physical parts to tracking inventory files.
 - **Natural Language Interface**: Chat with your inventory system using plain English
 - **Multi-Agent Architecture**: Specialized sub-agents for different tasks
   - **Part Namer**: Generates standardized names for mechanical and electrical components
+  - **McMaster-Carr Searcher**: Search and retrieve parts from McMaster-Carr catalog
   - **Inventory Manager**: Manages inventory files and tracks stock levels
 - **Rich Terminal UI**: Color-coded output with syntax highlighting
-- **Session Statistics**: Track token usage and API calls (optional)
+- **Debug Mode**: View tool usage and session statistics with `--debug` flag
 
 ## Prerequisites
 
@@ -45,25 +46,46 @@ physical parts to tracking inventory files.
    cp .env.example .env
    ```
 
-4. Edit `.env` and configure:
+4. Edit `.env` and configure required variables (see `.env.example` for all options):
 
    ```bash
-   # Set the directory for inventory files
-   INVENTORY_SUBAGENT_DIRECTORY=/path/to/your/inventory/files
+   # Required: Set the directory for inventory files
+   BINNY_INVENTORY_DIR=/path/to/your/inventory/files
+
+   # Required: Part namer configuration files
+   BINNY_MATERIALS_FILE=/path/to/.config/binny/part_namer/materials.md
+   BINNY_PREFIXES_FILE=/path/to/.config/binny/part_namer/prefixes.md
+
+   # Optional: McMaster-Carr integration (if using mmc-searcher)
+   # MCMASTER_USERNAME=your-email@example.com
+   # MCMASTER_PASSWORD=your-password
    ```
 
 ## Usage
 
-Run the application:
+Run the application in development mode:
 
 ```bash
-uv run main.py
+uv run binny
 ```
 
-Run with debug mode:
+Run with debug mode (shows tool usage and session statistics):
 
 ```bash
-uv run main.py --debug
+uv run binny --debug
+```
+
+Or install as a global tool:
+
+```bash
+uv tool install .
+binny
+```
+
+To reinstall after making changes:
+
+```bash
+uv tool install --reinstall .
 ```
 
 ### Example Interactions
@@ -84,6 +106,7 @@ Binny: [Uses part-namer to suggest a standardized name]
 - **Sub-agents**:
   - `part-namer`: Specialized in naming physical components following
     engineering conventions
+  - `mmc-searcher`: Searches McMaster-Carr catalog for parts and specifications
   - `inventory-manager`: Handles CRUD operations on inventory files
 
 ### System Prompts
@@ -92,6 +115,7 @@ Custom prompts for each agent are stored in `system_prompts/`:
 
 - `binny_prompt.md` - Main conversational agent
 - `part_namer_prompt.md` - Part naming specialist
+- `mmc_searcher_prompt.md` - McMaster-Carr catalog search
 - `inventory_manager_prompt.md` - Inventory operations
 
 ## Development
@@ -100,11 +124,16 @@ Custom prompts for each agent are stored in `system_prompts/`:
 
 ```text
 binny/
-   main.py              # Main application entry point
-   cli_tools.py         # Rich-based CLI interface
-   system_prompts/      # Agent system prompts
-   pyproject.toml       # Project dependencies
-   CLAUDE.md           # Developer guidance for Claude Code
+├── binny/                    # Main package
+│   ├── __init__.py
+│   ├── main.py              # Entry point and agent setup
+│   ├── cli_tools.py         # CLI interface and Rich formatting
+│   ├── part_namer_tools.py  # MCP tools for part naming
+│   └── part_namer_mcp/      # Utility library for part naming
+├── system_prompts/          # Agent system prompts
+├── .claude/                 # Slash commands
+├── pyproject.toml           # Package configuration with entry point
+└── CLAUDE.md                # Developer guidance for Claude Code
 ```
 
 ### Dependencies
@@ -112,6 +141,9 @@ binny/
 - `asyncio` - Async runtime
 - `claude-agent-sdk` - Claude Agent SDK
 - `rich` - Terminal formatting
+- `python-dotenv` - Environment variable management
+
+Build system: `hatchling` (configured in `[build-system]` section of pyproject.toml)
 
 ## License
 

@@ -13,3 +13,7 @@ dependencies = [
 
 [project.scripts]
 binny = "binny.main:main"
+
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"

@@ -45,7 +45,7 @@ wheels = [
 [[package]]
 name = "binny"
 version = "0.1.0"
-source = { virtual = "." }
+source = { editable = "." }
 dependencies = [
     { name = "asyncio" },
     { name = "claude-agent-sdk" },

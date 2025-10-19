@@ -37,6 +37,8 @@ binny/
 - **Sub-agents**:
   - `part-namer`: Generates names for physical parts in mechanical/electrical
     assemblies
+  - `mmc-searcher`: Handles McMaster-Carr catalog operations including searching
+    for parts, retrieving specifications, and managing subscriptions
   - `inventory-manager`: Manages inventory files stored in location specified
     by `BINNY_INVENTORY_DIR` environment variable
 
@@ -44,6 +46,7 @@ System prompts are loaded from `system_prompts/` directory:
 
 - `binny_prompt.md` - main agent prompt
 - `part_namer_prompt.md` - part naming agent prompt
+- `mmc_searcher_prompt.md` - McMaster-Carr search agent prompt
 - `inventory_manager_prompt.md` - inventory management agent prompt
 
 ### CLI Interface (binny/cli_tools.py)
@@ -53,7 +56,8 @@ Provides Rich-based terminal UI with:
 - Color-coded message panels (user/yellow, assistant/green, tool_use/blue,
   tool_result/magenta, system/cyan)
 - JSON syntax highlighting for tool results
-- Session statistics display (when enabled with `--stats`)
+- Debug mode (`--debug` or `-d` flag) to show tool use, tool results, and
+  session statistics
 - Message parsing for different Claude SDK message types: `AssistantMessage`,
   `UserMessage`, `SystemMessage`, `ResultMessage`
 
@@ -72,8 +76,15 @@ uv tool install .
 binny
 ```
 
-Note: cli_tools.py defines CLI argument flags (--stats, --model,
---output-style, --print-raw) but they are not currently wired up in main.py
+**Reinstall after making changes:**
+```bash
+uv tool install --reinstall .
+```
+
+**Debug mode:**
+```bash
+uv run binny --debug
+```
 
 ### Dependencies
 
@@ -82,8 +93,11 @@ Uses `uv` for dependency management. Dependencies are:
 - `asyncio>=4.0.0`
 - `claude-agent-sdk>=0.1.4`
 - `rich>=14.2.0`
+- `python-dotenv>=1.0.0`
 
 Python version: `>=3.13`
+
+Build system: `hatchling` (configured in `[build-system]` section of pyproject.toml)
 
 ### Environment Variables
 
@@ -93,7 +107,13 @@ Python version: `>=3.13`
   `~/.config/binny/part_namer/prefixes.md`)
 - `BINNY_MATERIALS_FILE` - path to materials.md (typically
   `~/.config/binny/part_namer/materials.md`)
-- API credentials loaded via `dotenv` in cli_tools.py:28
+- `MMC_SUBSCRIBED_PARTS_FILE` - path to McMaster-Carr subscribed parts file
+- `MCMASTER_USERNAME` - McMaster-Carr account email
+- `MCMASTER_PASSWORD` - McMaster-Carr account password
+- `MCMASTER_CERT_PATH` - path to McMaster-Carr certificate file (.pfx)
+- `MCMASTER_CERT_PASSWORD` - certificate password
+
+Environment variables are loaded via `python-dotenv` in main.py:12
 
 ### Part Namer MCP Server
 

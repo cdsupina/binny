@@ -21,18 +21,18 @@ async def async_main():
     console = Console()
 
     # Load Binny system prompt from file
-    binny_system_prompt_path = Path(__file__).parent.parent / "system_prompts/binny_prompt.md"
+    binny_system_prompt_path = Path(__file__).parent / "system_prompts/binny_prompt.md"
     binny_system_prompt = binny_system_prompt_path.read_text().strip()
 
     # Load part-namer system prompt from file
     part_namer_system_prompt_path = (
-        Path(__file__).parent.parent / "system_prompts/part_namer_prompt.md"
+        Path(__file__).parent / "system_prompts/part_namer_prompt.md"
     )
     part_namer_system_prompt = part_namer_system_prompt_path.read_text().strip()
 
     # Load inventory-manager system prompt from file
     inventory_manager_system_prompt_path = (
-        Path(__file__).parent.parent / "system_prompts/inventory_manager_prompt.md"
+        Path(__file__).parent / "system_prompts/inventory_manager_prompt.md"
     )
     inventory_manager_system_prompt = (
         inventory_manager_system_prompt_path.read_text().strip()
@@ -40,7 +40,7 @@ async def async_main():
 
     # Load mmc-searcher system prompt from file
     mmc_searcher_system_prompt_path = (
-        Path(__file__).parent.parent / "system_prompts/mmc_searcher_prompt.md"
+        Path(__file__).parent / "system_prompts/mmc_searcher_prompt.md"
     )
     mmc_searcher_system_prompt = mmc_searcher_system_prompt_path.read_text().strip()
 
