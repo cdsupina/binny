@@ -338,10 +338,10 @@ class BinnyApp(App):
         # to call the MCP tool more directly
         if proposal_type == "prefix":
             from ..part_namer_tools import approve_prefix_tool
-            await approve_prefix_tool({"proposal_id": proposal_id})
+            await approve_prefix_tool.handler({"proposal_id": proposal_id})
         else:
             from ..part_namer_tools import approve_material_tool
-            await approve_material_tool({"proposal_id": proposal_id})
+            await approve_material_tool.handler({"proposal_id": proposal_id})
 
     async def reject_proposal(self, proposal_data: dict, proposal_type: str) -> None:
         """Reject a proposal by calling the appropriate MCP tool."""
@@ -349,10 +349,10 @@ class BinnyApp(App):
 
         if proposal_type == "prefix":
             from ..part_namer_tools import reject_prefix_tool
-            await reject_prefix_tool({"proposal_id": proposal_id})
+            await reject_prefix_tool.handler({"proposal_id": proposal_id})
         else:
             from ..part_namer_tools import reject_material_tool
-            await reject_material_tool({"proposal_id": proposal_id})
+            await reject_material_tool.handler({"proposal_id": proposal_id})
 
     async def edit_proposal(self, proposal_data: dict, proposal_type: str) -> None:
         """Handle editing a proposal - reject it and prompt for changes."""
