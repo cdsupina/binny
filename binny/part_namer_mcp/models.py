@@ -14,6 +14,7 @@ class PrefixProposal(TypedDict):
     reasoning: str          # Why this prefix is needed
     timestamp: str
     proposal_id: str        # Unique identifier for this proposal
+    status: str             # "pending", "approved", or "rejected"
 
 
 class MaterialProposal(TypedDict):
@@ -26,6 +27,7 @@ class MaterialProposal(TypedDict):
     reasoning: str          # Why this material is needed
     timestamp: str
     proposal_id: str        # Unique identifier for this proposal
+    status: str             # "pending", "approved", or "rejected"
 
 
 class Prefix(TypedDict):
@@ -41,5 +43,3 @@ class Material(TypedDict):
     description: str
 
 
-# Type alias for approval actions
-ApprovalAction = Literal['approve', 'reject', 'defer']

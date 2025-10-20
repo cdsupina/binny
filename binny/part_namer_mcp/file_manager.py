@@ -3,11 +3,14 @@
 Handles parsing and writing H2-based markdown files.
 """
 
+import logging
 import re
 from pathlib import Path
 from typing import List
 
 from .models import Prefix, Material, PrefixProposal, MaterialProposal
+
+logger = logging.getLogger(__name__)
 
 
 def parse_prefixes_file(file_path: Path) -> List[Prefix]:
@@ -139,7 +142,7 @@ def append_prefix_to_file(file_path: Path, proposal: PrefixProposal) -> bool:
         return True
 
     except Exception as e:
-        print(f"Error appending prefix: {e}")
+        logger.error(f"Error appending prefix: {e}")
         return False
 
 
@@ -170,5 +173,5 @@ def append_material_to_file(file_path: Path, proposal: MaterialProposal) -> bool
         return True
 
     except Exception as e:
-        print(f"Error appending material: {e}")
+        logger.error(f"Error appending material: {e}")
         return False

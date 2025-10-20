@@ -22,11 +22,6 @@ from .part_namer_mcp.file_manager import (
     append_prefix_to_file,
     append_material_to_file,
 )
-from .part_namer_mcp.approval_workflow import (
-    format_prefix_proposal,
-    format_material_proposal,
-    format_approval_prompt,
-)
 
 # Get file paths from environment variables with XDG defaults
 _default_config_dir = Path.home() / ".config/binny/part_namer"
@@ -159,17 +154,20 @@ async def propose_prefix_tool(args: dict[str, Any]) -> dict:
         reasoning=args["reasoning"],
         timestamp=datetime.now().isoformat(),
         proposal_id=proposal_id,
+        status="pending",
     )
     save_prefix_proposal(proposal)
 
-    panel_text = format_prefix_proposal(proposal)
-
-    # Add clear marker for proposals
-    marker = "🔔 PROPOSAL REQUIRES APPROVAL 🔔\n\n"
-
     return {
         "content": [
-            {"type": "text", "text": f"{marker}{panel_text}"}
+            {
+                "type": "text",
+                "text": json.dumps({
+                    "type": "proposal",
+                    "proposal_type": "prefix",
+                    "data": proposal
+                }, indent=2)
+            }
         ]
     }
 
@@ -192,17 +190,20 @@ async def propose_material_tool(args: dict[str, Any]) -> dict:
         reasoning=args["reasoning"],
         timestamp=datetime.now().isoformat(),
         proposal_id=proposal_id,
+        status="pending",
     )
     save_material_proposal(proposal)
 
-    panel_text = format_material_proposal(proposal)
-
-    # Add clear marker for proposals
-    marker = "🔔 PROPOSAL REQUIRES APPROVAL 🔔\n\n"
-
     return {
         "content": [
-            {"type": "text", "text": f"{marker}{panel_text}"}
+            {
+                "type": "text",
+                "text": json.dumps({
+                    "type": "proposal",
+                    "proposal_type": "material",
+                    "data": proposal
+                }, indent=2)
+            }
         ]
     }
 
@@ -333,17 +334,13 @@ async def list_prefix_proposals_tool(args: dict[str, Any]) -> dict:
     if not proposals:
         return {
             "content": [
-                {"type": "text", "text": "No pending prefix proposals"}
+                {"type": "text", "text": json.dumps({"proposals": []}, indent=2)}
             ]
         }
 
-    formatted = []
-    for proposal in proposals:
-        formatted.append(format_prefix_proposal(proposal))
-
     return {
         "content": [
-            {"type": "text", "text": "\n\n".join(formatted)}
+            {"type": "text", "text": json.dumps({"proposals": proposals}, indent=2)}
         ]
     }
 
@@ -356,17 +353,13 @@ async def list_material_proposals_tool(args: dict[str, Any]) -> dict:
     if not proposals:
         return {
             "content": [
-                {"type": "text", "text": "No pending material proposals"}
+                {"type": "text", "text": json.dumps({"proposals": []}, indent=2)}
             ]
         }
 
-    formatted = []
-    for proposal in proposals:
-        formatted.append(format_material_proposal(proposal))
-
     return {
         "content": [
-            {"type": "text", "text": "\n\n".join(formatted)}
+            {"type": "text", "text": json.dumps({"proposals": proposals}, indent=2)}
         ]
     }
 

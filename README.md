@@ -1,23 +1,34 @@
 # Binny
 
-An intelligent CLI inventory management chatbot built with the Claude Agent SDK.
+An intelligent TUI inventory management chatbot built with the Claude Agent SDK and Textual.
 
 ## Overview
 
 Binny is a conversational interface for managing inventory through natural
-language. Built on a multi-agent architecture, Binny uses specialized
-sub-agents to handle different aspects of inventory management, from naming
-physical parts to tracking inventory files.
+language. Built on a multi-agent architecture with a modern terminal user interface,
+Binny uses specialized sub-agents to handle different aspects of inventory management,
+from naming physical parts to tracking inventory files.
 
 ## Features
 
+- **Modern Terminal UI**: Interactive Textual-based TUI with status bar, chat view, and modal dialogs
 - **Natural Language Interface**: Chat with your inventory system using plain English
 - **Multi-Agent Architecture**: Specialized sub-agents for different tasks
-  - **Part Namer**: Generates standardized names for mechanical and electrical components
+  - **Part Namer**: Generates standardized names with proposal-based approval workflow
   - **McMaster-Carr Searcher**: Search and retrieve parts from McMaster-Carr catalog
   - **Inventory Manager**: Manages inventory files and tracks stock levels
-- **Rich Terminal UI**: Color-coded output with syntax highlighting
-- **Debug Mode**: View tool usage and session statistics with `--debug` flag
+- **Deterministic Approval Workflow**: Interactive modals for approving/rejecting part naming proposals
+- **Clipboard Support**: Copy assistant responses or entire chat with keyboard shortcuts
+- **Color-Coded Output**: Rich formatting with syntax highlighting
+- **Debug Mode**: View tool usage and session statistics with `Ctrl+D` toggle
+
+### Keyboard Shortcuts
+
+- **`Ctrl+C`**: Quit (clean exit)
+- **`Ctrl+Y`**: Copy last assistant response to clipboard
+- **`Ctrl+L`**: Copy entire chat to clipboard
+- **`Ctrl+D`**: Toggle debug mode
+- **`Ctrl+R`**: Review all pending proposals
 
 ## Prerequisites
 
@@ -94,9 +105,23 @@ uv tool install --reinstall .
 You: I need to add 50 units of M3x10mm screws to inventory
 Binny: [Uses inventory-manager to update your inventory files]
 
-You: What should I call this 3-pin connector with 2.54mm pitch?
-Binny: [Uses part-namer to suggest a standardized name]
+You: Name this M8x20mm socket head cap screw in 18-8 stainless steel
+Binny: [Uses part-namer to generate standardized name]
+      [If prefix/material not tracked, shows interactive approval modal]
+      [User approves via modal buttons: Approve/Reject/Edit/Defer]
+      Result: SCREW-SS118-M8-20
+
+You: Search McMaster-Carr for metric washers
+Binny: [Uses mmc-searcher to find parts and specifications]
 ```
+
+### UI Features
+
+- **Status Bar**: Shows pending proposal count (clickable to review)
+- **Chat View**: Scrollable color-coded message panels
+- **Proposal Modals**: Interactive dialogs with button navigation
+- **System Messages**: Confirmation messages for all actions
+- **Welcome Screen**: Displays help and keyboard shortcuts on startup
 
 ## Architecture
 
@@ -126,11 +151,18 @@ Custom prompts for each agent are stored in `system_prompts/`:
 binny/
 ├── binny/                    # Main package
 │   ├── __init__.py
-│   ├── main.py              # Entry point and agent setup
-│   ├── cli_tools.py         # CLI interface and Rich formatting
+│   ├── main.py              # Entry point - launches TUI
+│   ├── cli_tools.py         # CLI utilities (arg parsing)
 │   ├── part_namer_tools.py  # MCP tools for part naming
-│   └── part_namer_mcp/      # Utility library for part naming
-├── system_prompts/          # Agent system prompts
+│   ├── part_namer_mcp/      # Utility library for part naming
+│   │   ├── models.py        # TypedDicts for proposals
+│   │   └── file_manager.py  # File I/O for prefixes/materials
+│   ├── tui/                 # Textual TUI components
+│   │   ├── app.py           # Main TUI application
+│   │   ├── status_bar.py    # Pending proposal status
+│   │   ├── chat_view.py     # Message display
+│   │   └── proposal_modal.py # Approval modal dialog
+│   └── system_prompts/      # Agent system prompts
 ├── .claude/                 # Slash commands
 ├── pyproject.toml           # Package configuration with entry point
 └── CLAUDE.md                # Developer guidance for Claude Code
@@ -140,10 +172,28 @@ binny/
 
 - `asyncio` - Async runtime
 - `claude-agent-sdk` - Claude Agent SDK
+- `textual` - Modern TUI framework
 - `rich` - Terminal formatting
 - `python-dotenv` - Environment variable management
 
 Build system: `hatchling` (configured in `[build-system]` section of pyproject.toml)
+
+### Part Naming Workflow
+
+The part-namer agent uses a rigidly controlled naming system:
+
+1. **Validation**: Checks if prefix/material exists in tracking files
+2. **Proposal Creation**: If missing, creates a proposal (returns JSON)
+3. **TUI Detection**: TUI detects proposal in tool result
+4. **Interactive Modal**: Shows modal with Approve/Reject/Edit/Defer buttons
+5. **Deterministic Action**: User clicks button → TUI calls MCP tool directly
+6. **File Update**: Approved items written to markdown files in H2 format
+
+**Key Features:**
+- No agent interpretation of approval responses
+- All approval logic handled by TUI
+- Proposals stored in JSONL files
+- Can review pending proposals with `Ctrl+R` or click status bar
 
 ## License
 

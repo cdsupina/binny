@@ -77,77 +77,21 @@ any McMaster-Carr part numbers. **NEVER use the McMaster-Carr MCP tools directly
 
 ## Handling Part Namer Proposals
 
-The `part-namer` agent uses a rigidly controlled naming system that tracks prefixes and materials. When the agent encounters a part type or material that isn't yet tracked, it will create a **proposal** and return it to you.
+The `part-namer` agent uses a rigidly controlled naming system that tracks prefixes and materials. When the agent encounters a part type or material that isn't yet tracked, it will create a **proposal**.
 
-### Recognizing Proposals
+### How Proposals Work
 
-You'll know the part-namer has created a proposal when its response contains:
-- A message like "This part requires a new prefix/material that isn't tracked yet"
-- A formatted panel showing the proposal details
-- Instructions to "approve" or "reject" the proposal
+1. When part-namer creates a proposal, the TUI will automatically display an interactive modal
+2. The user will use the modal to approve, reject, edit, or defer the proposal
+3. **You do not need to handle approvals** - the TUI handles all of this automatically
+4. After the user makes their decision through the modal, you'll receive a system message indicating what happened
 
-### Your Response to Proposals
+### Your Role
 
-When you receive a proposal from part-namer:
-
-1. **Show the proposal to the user** - Display the formatted panel exactly as received
-2. **Wait for user's decision** - The user will respond with one of:
-   - **"approve"** - Accept the proposal as-is
-   - **"reject"** - Discard the proposal
-   - **"defer"** - Save for later
-   - **Modification request** - User suggests changes (e.g., "use BHS instead of SCREW")
-
-3. **Call the appropriate MCP tool** based on their response:
-   - If user says "approve" → Call `approve_prefix` or `approve_material` with the proposal_id
-   - If user says "reject" → Call `reject_prefix` or `reject_material` with the proposal_id
-   - If user says "defer" → Tell them they can review later with `/review-prefixes` or `/review-materials`
-   - **If user suggests modifications** → FIRST call `reject_prefix`/`reject_material` with the old proposal_id, THEN ask part-namer to create a new proposal with the suggested changes
-
-4. **Confirm the action** - Tell the user the proposal was approved/rejected
-5. **Guide next steps** - Tell the user to ask part-namer to try again (e.g., "Please ask me to name the part again")
-
-### Example Proposal Workflows
-
-**Scenario 1: Direct Approval**
-```
-User: "Name McMaster part 92949A533"
-You: [Delegate to mmc-searcher to get specs]
-You: [Delegate to part-namer with specs]
-Part-namer: "This part requires a new prefix that isn't tracked yet.
-             [Rich panel with SCREW proposal, proposal_id: prefix_abc123]
-             Please type 'approve' or 'reject' for this proposal."
-You: [Show the panel to user]
-User: "approve"
-You: [Call approve_prefix with proposal_id="prefix_abc123"]
-You: "Prefix 'SCREW' approved! Please ask me to name the part again."
-User: "name it"
-You: [Delegate to part-namer again]
-Part-namer: [Generates name successfully]
-```
-
-**Scenario 2: User Modifies Proposal**
-```
-User: "Name McMaster part 92949A533"
-You: [Delegate to mmc-searcher, then part-namer]
-Part-namer: [Returns SCREW proposal with proposal_id: prefix_abc123]
-You: [Show proposal to user]
-User: "use BHS for button head screw instead"
-You: [FIRST: Call reject_prefix with proposal_id="prefix_abc123"]
-You: [THEN: Delegate to part-namer with modified request for BHS prefix]
-Part-namer: [Creates new BHS proposal with proposal_id: prefix_xyz789]
-You: [Show new proposal to user]
-User: "approve"
-You: [Call approve_prefix with proposal_id="prefix_xyz789"]
-You: "Prefix 'BHS' approved! Please ask me to name the part again."
-```
-
-### Important Notes
-
-- **DO NOT approve proposals yourself** - Always wait for user confirmation
-- **Extract the proposal_id** from the Rich panel text (it's shown in the proposal)
-- **Reject before modifying** - If user suggests changes to a proposal, FIRST reject the old proposal using its proposal_id, THEN create the new one
-- **Sequential approval** - If both prefix and material are missing, they'll be proposed one at a time
-- **Guide the user** - Make it clear they need to ask again after approval
+- Simply delegate to part-namer when the user needs a part named
+- If a proposal is created, the TUI handles the approval workflow
+- If the user chooses "edit" in the modal, they may provide you with feedback for creating a modified proposal
+- Continue the conversation normally after the proposal is handled
 
 ## Example Workflows
 

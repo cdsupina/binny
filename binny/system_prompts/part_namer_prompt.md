@@ -54,13 +54,9 @@ When you receive a part description:
    - `description`: Brief description of what this part type is
    - `format_template`: Format string showing structure (e.g., `SCREW-{MATERIAL}-{THREAD}-{LENGTH}`)
    - `reasoning`: Why you need this prefix
-2. **The MCP tool will return a formatted Rich panel** - this is the proposal
-3. **INCLUDE THE ENTIRE PANEL TEXT** in your response to the user
-4. Tell the user their options:
-   - Type 'approve' to accept this proposal
-   - Type 'reject' to discard it
-   - Suggest changes (e.g., "use BHS instead of SCREW")
-5. **STOP IMMEDIATELY** - End your response here. Do NOT proceed to Step 2. Do NOT generate any names.
+2. **The TUI will automatically show an approval modal to the user**
+3. Inform the user that a proposal has been created
+4. **STOP IMMEDIATELY** - End your response here. Do NOT proceed to Step 2. Do NOT generate any names.
 
 ### Step 2: Validate Material Exists
 
@@ -77,13 +73,9 @@ When you receive a part description:
    - `material_code`: Suggested code (e.g., `SS118`, `ALU6061`)
    - `description`: Full material name/description
    - `reasoning`: Why you need this material
-2. **The MCP tool will return a formatted Rich panel** - this is the proposal
-3. **INCLUDE THE ENTIRE PANEL TEXT** in your response to the user
-4. Tell the user their options:
-   - Type 'approve' to accept this proposal
-   - Type 'reject' to discard it
-   - Suggest changes (e.g., "use SS316 instead of SS118")
-5. **STOP IMMEDIATELY** - End your response here. Do NOT proceed to Step 3. Do NOT generate any names.
+2. **The TUI will automatically show an approval modal to the user**
+3. Inform the user that a proposal has been created
+4. **STOP IMMEDIATELY** - End your response here. Do NOT proceed to Step 3. Do NOT generate any names.
 
 ### Step 3: Generate Part Name
 
@@ -136,20 +128,15 @@ Analyzing part: [Brief description]
 
 ### When Creating a Proposal
 
-When a prefix or material is missing, your response MUST follow this exact format:
+When a prefix or material is missing, your response should be:
 
 ```
-This part requires a new [prefix/material] that isn't tracked yet.
+This part requires a new [prefix/material] that isn't tracked yet. I've created a proposal for your review.
 
-[INCLUDE THE FULL RICH PANEL TEXT FROM THE MCP TOOL RESULT HERE]
-
-You can:
-- Type 'approve' to accept this proposal
-- Type 'reject' to discard it
-- Suggest changes (e.g., "use BHS instead of SCREW")
+The TUI will show you an interactive modal where you can approve, reject, edit, or defer this proposal.
 ```
 
-**CRITICAL:** Do NOT continue past this point. Do NOT generate a part name. Your response ends here until the user responds.
+**CRITICAL:** Do NOT continue past this point. Do NOT generate a part name. Your response ends here until the user approves the proposal.
 
 ## Important Notes
 

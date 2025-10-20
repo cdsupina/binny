@@ -5,9 +5,10 @@ code in this repository.
 
 ## Project Overview
 
-Binny is a CLI application built with the Claude Agent SDK that provides an
-inventory management chatbot. The application uses a multi-agent architecture
-with specialized sub-agents for different tasks.
+Binny is a TUI (Terminal User Interface) application built with the Claude Agent
+SDK and Textual that provides an inventory management chatbot. The application
+uses a multi-agent architecture with specialized sub-agents for different tasks
+and features a deterministic approval workflow for part naming proposals.
 
 ## Architecture
 
@@ -19,14 +20,19 @@ Binny uses a standard Python package layout:
 binny/
 ├── binny/                    # Main package
 │   ├── __init__.py
-│   ├── main.py              # Entry point and agent setup
-│   ├── cli_tools.py         # CLI interface and Rich formatting
+│   ├── main.py              # Entry point - launches TUI
+│   ├── cli_tools.py         # CLI utilities (arg parsing, legacy functions)
 │   ├── part_namer_tools.py  # MCP tools for part naming
-│   └── part_namer_mcp/      # Utility library for part naming
-│       ├── models.py
-│       ├── file_manager.py
-│       └── approval_workflow.py
-├── system_prompts/          # Agent system prompts
+│   ├── part_namer_mcp/      # Utility library for part naming
+│   │   ├── models.py        # TypedDicts for proposals
+│   │   └── file_manager.py  # File I/O for prefixes/materials
+│   ├── tui/                 # Textual TUI components
+│   │   ├── __init__.py
+│   │   ├── app.py           # Main TUI application
+│   │   ├── status_bar.py    # Pending proposal status
+│   │   ├── chat_view.py     # Message display
+│   │   └── proposal_modal.py # Approval modal dialog
+│   └── system_prompts/      # Agent system prompts
 ├── .claude/                 # Slash commands
 └── pyproject.toml          # Package configuration with entry point
 ```
@@ -49,17 +55,34 @@ System prompts are loaded from `system_prompts/` directory:
 - `mmc_searcher_prompt.md` - McMaster-Carr search agent prompt
 - `inventory_manager_prompt.md` - inventory management agent prompt
 
-### CLI Interface (binny/cli_tools.py)
+### TUI Interface (binny/tui/)
 
-Provides Rich-based terminal UI with:
+Provides Textual-based Terminal User Interface with:
+
+- **Status Bar** (`status_bar.py`): Shows pending proposal count, clickable to
+  review
+- **Chat View** (`chat_view.py`): Scrollable message display with Rich
+  formatting
+- **Proposal Modal** (`proposal_modal.py`): Interactive approval dialog with
+  Approve/Reject/Edit/Defer buttons
+- **Main App** (`app.py`): Async integration with Claude SDK, deterministic
+  proposal handling
+
+Features:
 
 - Color-coded message panels (user/yellow, assistant/green, tool_use/blue,
   tool_result/magenta, system/cyan)
 - JSON syntax highlighting for tool results
-- Debug mode (`--debug` or `-d` flag) to show tool use, tool results, and
-  session statistics
-- Message parsing for different Claude SDK message types: `AssistantMessage`,
-  `UserMessage`, `SystemMessage`, `ResultMessage`
+- Debug mode (`--debug` or `-d` flag) to show tool use and tool results
+- Keyboard shortcuts:
+  - `Ctrl+C`: Quit
+  - `Ctrl+D`: Toggle Debug
+  - `Ctrl+R`: Review Proposals
+  - `Ctrl+Y`: Copy last assistant response to clipboard
+  - `Ctrl+L`: Copy entire chat to clipboard
+- Clipboard support via OSC 52 escape sequences (works in most modern terminals)
+- Clickable status bar to trigger proposal review
+- Deterministic approval workflow (no agent interpretation)
 
 ## Development Commands
 
@@ -92,6 +115,7 @@ Uses `uv` for dependency management. Dependencies are:
 
 - `asyncio>=4.0.0`
 - `claude-agent-sdk>=0.1.4`
+- `textual>=0.95.0`
 - `rich>=14.2.0`
 - `python-dotenv>=1.0.0`
 
@@ -126,15 +150,17 @@ naming with a proposal-based workflow. MCP tools are defined in
 - `part_namer_tools.py` - 10 MCP tools using @tool decorator (embedded server)
 - `part_namer_mcp/models.py` - TypedDicts for PrefixProposal and MaterialProposal
 - `part_namer_mcp/file_manager.py` - Parse/write H2-based markdown files
-- `part_namer_mcp/approval_workflow.py` - Rich panel formatting for proposals
 
 **Workflow:**
 
 1. Part-namer sub-agent checks if prefix/material exists via MCP tools
 2. If missing, creates proposal using `propose_prefix` or `propose_material`
-3. User approves/rejects via immediate prompt or `/review-prefixes` /
-   `/review-materials` commands
-4. Approved items are written to respective markdown files in H2 format
+   - Tools return pure JSON (no Rich formatting)
+   - TUI detects proposal in tool result
+3. TUI displays interactive modal with Approve/Reject/Edit/Defer buttons
+4. User interacts with modal (deterministic, no agent interpretation)
+5. TUI calls appropriate approval/rejection MCP tool
+6. Approved items are written to respective markdown files in H2 format
 
 **File Format:**
 
@@ -151,15 +177,17 @@ Prefixes and materials are stored as H2 headers with structured fields:
 **MCP Tools:**
 
 - `read_prefixes` / `read_materials` - Get tracked items
-- `propose_prefix` / `propose_material` - Create proposals
+- `propose_prefix` / `propose_material` - Create proposals (returns JSON)
 - `approve_prefix` / `approve_material` - Approve and write to files
 - `reject_prefix` / `reject_material` - Reject proposals
-- `list_prefix_proposals` / `list_material_proposals` - List pending
+- `list_prefix_proposals` / `list_material_proposals` - List pending (returns
+  JSON)
 
-**Slash Commands:**
+**TUI Review:**
 
-- `/review-prefixes` - Review pending prefix proposals
-- `/review-materials` - Review pending material proposals
+- Keyboard shortcut `Ctrl+R` triggers proposal review
+- Clicking status bar when proposals are pending triggers review
+- Interactive modals for each proposal with button navigation
 
 ## Agent SDK Integration
 
