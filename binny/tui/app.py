@@ -8,6 +8,7 @@ from textual.app import App, ComposeResult
 from textual.binding import Binding
 from textual.widgets import Header, Footer, Input
 from textual.containers import Container, Vertical
+from textual import work
 from claude_agent_sdk.client import ClaudeSDKClient
 from claude_agent_sdk import (
     AgentDefinition,
@@ -379,6 +380,7 @@ class BinnyApp(App):
         else:
             chat_view.add_system_message("✓ Debug mode disabled")
 
+    @work
     async def action_review_proposals(self) -> None:
         """Review all pending proposals via interactive modals."""
         # Load all pending proposals

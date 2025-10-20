@@ -17,19 +17,20 @@ class ProposalModal(ModalScreen[str]):
     }
 
     #proposal-container {
-        width: 90;
+        width: 80;
         height: auto;
-        max-height: 80%;
+        max-height: 90%;
         background: $surface;
         border: thick $accent;
-        padding: 2;
-        border-title-align: center;
+        padding: 1;
     }
 
     #proposal-content {
         width: 100%;
         height: auto;
-        margin-bottom: 2;
+        max-height: 15;
+        overflow-y: auto;
+        margin-bottom: 1;
         padding: 1;
         background: $panel;
         border: round $primary;
@@ -49,7 +50,7 @@ class ProposalModal(ModalScreen[str]):
 
     Button {
         margin: 0 1;
-        min-width: 12;
+        min-width: 10;
     }
     """
 
@@ -67,7 +68,7 @@ class ProposalModal(ModalScreen[str]):
     def compose(self) -> ComposeResult:
         """Compose the modal content."""
         with Container(id="proposal-container"):
-            yield Label(self._format_proposal(), id="proposal-content")
+            yield Static(Markdown(self._format_proposal()), id="proposal-content")
             with Horizontal(id="button-container"):
                 yield Button("Approve", id="approve", variant="success")
                 yield Button("Reject", id="reject", variant="error")
