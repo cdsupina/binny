@@ -39,6 +39,15 @@ class ProposalModal(ModalScreen[str]):
         color: $accent;
     }
 
+    #decision-summary {
+        width: 100%;
+        height: auto;
+        text-align: center;
+        content-align: center middle;
+        margin-bottom: 1;
+        color: $text-muted;
+    }
+
     #proposal-content {
         width: 100%;
         height: auto;
@@ -126,6 +135,10 @@ class ProposalModal(ModalScreen[str]):
             # Show proposal counter if multiple proposals
             if len(self.all_proposals) > 1:
                 yield Static(
+                    self._format_decision_summary(),
+                    id="decision-summary"
+                )
+                yield Static(
                     self._format_header(),
                     id="proposal-header"
                 )
@@ -152,6 +165,67 @@ class ProposalModal(ModalScreen[str]):
             action = self.proposal_actions[self.current_index]
             header += f" - Action: {action.upper()}"
         return header
+
+    def _format_decision_summary(self) -> str:
+        """Format the decision summary line with smart windowing."""
+        total = len(self.all_proposals)
+
+        # Action symbols with colors
+        symbols = {
+            "approve": ("✓", "green"),
+            "reject": ("✗", "red"),
+            "edit": ("✎", "yellow"),
+            None: ("-", "dim")
+        }
+
+        # For ≤10 proposals, show all
+        if total <= 10:
+            parts = []
+            for i in range(total):
+                action = self.proposal_actions.get(i)
+                symbol, color = symbols.get(action, symbols[None])
+                if i == self.current_index:
+                    parts.append(f"[reverse bold {color}][{i+1}:{symbol}][/reverse bold {color}]")
+                else:
+                    parts.append(f"[{color}][{i+1}:{symbol}][/{color}]")
+            return " ".join(parts)
+
+        # For >10 proposals, show 7 items with current centered when possible
+        parts = []
+        current = self.current_index
+        window_size = 7
+        half_window = 3
+
+        # Calculate window bounds, keeping current centered when possible
+        start = current - half_window
+        end = current + half_window
+
+        # Adjust if window goes out of bounds
+        if start < 0:
+            start = 0
+            end = min(total - 1, window_size - 1)
+        elif end >= total:
+            end = total - 1
+            start = max(0, end - window_size + 1)
+
+        # Show ellipsis at start if there are items before the window
+        if start > 0:
+            parts.append("[dim]...[/dim]")
+
+        # Show the 7-item window
+        for i in range(start, end + 1):
+            action = self.proposal_actions.get(i)
+            symbol, color = symbols.get(action, symbols[None])
+            if i == current:
+                parts.append(f"[reverse bold {color}][{i+1}:{symbol}][/reverse bold {color}]")
+            else:
+                parts.append(f"[{color}][{i+1}:{symbol}][/{color}]")
+
+        # Show ellipsis at end if there are items after the window
+        if end < total - 1:
+            parts.append("[dim]...[/dim]")
+
+        return " ".join(parts)
 
     def _format_proposal(self) -> str:
         """Format the proposal data for display."""
@@ -220,9 +294,15 @@ class ProposalModal(ModalScreen[str]):
             self.dismiss(button_id)
 
     def mark_action(self, action: str) -> None:
-        """Mark an action for the current proposal."""
-        # Store the action
-        self.proposal_actions[self.current_index] = action
+        """Mark an action for the current proposal (toggle if already set)."""
+        # If the same action is already selected, deselect it
+        current_action = self.proposal_actions.get(self.current_index)
+        if current_action == action:
+            # Remove the action (deselect)
+            del self.proposal_actions[self.current_index]
+        else:
+            # Set the new action
+            self.proposal_actions[self.current_index] = action
 
         # Update visual feedback
         self.update_action_buttons()
@@ -231,6 +311,13 @@ class ProposalModal(ModalScreen[str]):
         try:
             header = self.query_one("#proposal-header", Static)
             header.update(self._format_header())
+        except:
+            pass
+
+        # Update the decision summary
+        try:
+            summary = self.query_one("#decision-summary", Static)
+            summary.update(self._format_decision_summary())
         except:
             pass
 
@@ -269,6 +356,13 @@ class ProposalModal(ModalScreen[str]):
         try:
             header = self.query_one("#proposal-header", Static)
             header.update(self._format_header())
+        except:
+            pass
+
+        # Update the decision summary
+        try:
+            summary = self.query_one("#decision-summary", Static)
+            summary.update(self._format_decision_summary())
         except:
             pass
 
