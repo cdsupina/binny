@@ -4,12 +4,17 @@ from textual.app import ComposeResult
 from textual.screen import ModalScreen
 from textual.widgets import Button, Static, Label
 from textual.containers import Container, Horizontal, Vertical
+from textual.binding import Binding
 from rich.panel import Panel
 from rich.markdown import Markdown
 
 
 class ProposalModal(ModalScreen[str]):
     """Modal dialog for approving/rejecting/editing/deferring proposals."""
+
+    BINDINGS = [
+        Binding("escape", "dismiss_defer", "Defer", show=False),
+    ]
 
     DEFAULT_CSS = """
     ProposalModal {
@@ -114,8 +119,34 @@ class ProposalModal(ModalScreen[str]):
 """
         return content
 
+    def on_mount(self) -> None:
+        """Set initial focus when modal mounts."""
+        # Focus the first button (Approve) by default
+        approve_button = self.query_one("#approve", Button)
+        approve_button.focus()
+
     async def on_button_pressed(self, event: Button.Pressed) -> None:
         """Handle button presses."""
         button_id = event.button.id
         if button_id:
             self.dismiss(button_id)
+
+    def key_left(self) -> None:
+        """Move focus to previous button with left arrow."""
+        self.focus_previous()
+
+    def key_right(self) -> None:
+        """Move focus to next button with right arrow."""
+        self.focus_next()
+
+    def key_space(self) -> None:
+        """Activate focused button with space bar."""
+        # Get the currently focused widget
+        focused = self.focused
+        if isinstance(focused, Button):
+            # Trigger the button press
+            self.post_message(Button.Pressed(focused))
+
+    def action_dismiss_defer(self) -> None:
+        """Dismiss modal with defer action on Escape key."""
+        self.dismiss("defer")
