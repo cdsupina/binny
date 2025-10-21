@@ -296,22 +296,38 @@ class BinnyApp(App):
 
         return None
 
-    async def show_proposal_modal(self, proposal_data: dict, proposal_type: str) -> None:
+    async def show_proposal_modal(
+        self,
+        proposal_data: dict,
+        proposal_type: str,
+        all_proposals: list[tuple[str, dict]] | None = None,
+        current_index: int = 0,
+    ) -> None:
         """Show the proposal approval modal.
 
         Args:
             proposal_data: The proposal data
             proposal_type: Either "prefix" or "material"
+            all_proposals: Optional list of all proposals for navigation
+            current_index: Current index in the all_proposals list
         """
         # Show modal and get user's choice
         result = await self.push_screen_wait(
-            ProposalModal(proposal_data, proposal_type)
+            ProposalModal(proposal_data, proposal_type, all_proposals, current_index)
         )
 
         chat_view = self.query_one(ChatView)
 
         # Handle the user's choice
-        if result == "approve":
+        # If result is None, user cancelled (Escape on batch review)
+        if result is None:
+            chat_view.add_system_message("Proposal review cancelled.")
+            return
+        # If result is a dict, it's multiple actions from batch review
+        elif isinstance(result, dict):
+            await self.process_batch_actions(result, all_proposals or [(proposal_type, proposal_data)])
+        # Single action
+        elif result == "approve":
             await self.approve_proposal(proposal_data, proposal_type)
             chat_view.add_system_message(
                 f"✓ {proposal_type.capitalize()} proposal approved!"
@@ -325,8 +341,66 @@ class BinnyApp(App):
             await self.edit_proposal(proposal_data, proposal_type)
         elif result == "defer":
             chat_view.add_system_message(
-                f"Proposal deferred. Use /review-{proposal_type}s to review later."
+                f"Proposal deferred. Use Ctrl+R to review later."
             )
+
+    async def process_batch_actions(
+        self,
+        actions: dict[int, str],
+        all_proposals: list[tuple[str, dict]]
+    ) -> None:
+        """Process batch actions for multiple proposals.
+
+        Args:
+            actions: Dict mapping proposal index to action (approve/reject/edit/defer)
+            all_proposals: List of all (type, data) tuples
+        """
+        chat_view = self.query_one(ChatView)
+
+        # Process each action
+        approved = []
+        rejected = []
+        deferred = []
+        edited = []
+
+        for index, action in actions.items():
+            if index >= len(all_proposals):
+                continue
+
+            prop_type, prop_data = all_proposals[index]
+
+            if action == "approve":
+                await self.approve_proposal(prop_data, prop_type)
+                approved.append(f"{prop_type}:{prop_data.get('prefix') or prop_data.get('material_code')}")
+            elif action == "reject":
+                await self.reject_proposal(prop_data, prop_type)
+                rejected.append(f"{prop_type}:{prop_data.get('prefix') or prop_data.get('material_code')}")
+            elif action == "defer":
+                deferred.append(f"{prop_type}:{prop_data.get('prefix') or prop_data.get('material_code')}")
+            elif action == "edit":
+                await self.reject_proposal(prop_data, prop_type)
+                edited.append(f"{prop_type}:{prop_data.get('prefix') or prop_data.get('material_code')}")
+
+        # Show summary
+        summary = []
+        if approved:
+            summary.append(f"✓ Approved: {', '.join(approved)}")
+        if rejected:
+            summary.append(f"✗ Rejected: {', '.join(rejected)}")
+        if edited:
+            summary.append(f"✎ Marked for edit: {', '.join(edited)}")
+        if deferred:
+            summary.append(f"⊙ Deferred: {', '.join(deferred)}")
+
+        # Show what wasn't acted on
+        unprocessed_count = len(all_proposals) - len(actions)
+        if unprocessed_count > 0:
+            summary.append(f"⊙ {unprocessed_count} proposal(s) left without action (deferred)")
+
+        if summary:
+            chat_view.add_system_message("Batch review complete:\n" + "\n".join(summary))
+        else:
+            chat_view.add_system_message("No actions were selected.")
 
     async def approve_proposal(self, proposal_data: dict, proposal_type: str) -> None:
         """Approve a proposal by calling the appropriate MCP tool."""
@@ -403,9 +477,9 @@ class BinnyApp(App):
             f"Reviewing {len(all_proposals)} pending proposal(s)..."
         )
 
-        # Show modals for each proposal
-        for proposal_type, proposal_data in all_proposals:
-            await self.show_proposal_modal(proposal_data, proposal_type)
+        # Show single modal with all proposals (user can navigate through them)
+        first_type, first_data = all_proposals[0]
+        await self.show_proposal_modal(first_data, first_type, all_proposals, 0)
 
         chat_view.add_system_message("Proposal review complete!")
 
