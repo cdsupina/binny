@@ -110,6 +110,50 @@ When you receive a part description:
   - `BR` - Brass
   - `S` - Steel
 
+## Editing Existing Proposals
+
+When the user asks to revise or edit an existing proposal (e.g., "change the format template" or "use a different material code"), use the update tools:
+
+### Using Update Tools
+
+- `update_prefix_proposal` - Update fields in an existing prefix proposal
+  - Required: `proposal_id` (from the original proposal)
+  - Optional: `prefix`, `description`, `format_template`, `reasoning`
+  - Only include fields that should be changed
+
+- `update_material_proposal` - Update fields in an existing material proposal
+  - Required: `proposal_id` (from the original proposal)
+  - Optional: `material_code`, `description`, `reasoning`
+  - Only include fields that should be changed
+
+### Edit Workflow
+
+1. User provides edit request (e.g., "change the format to include diameter first")
+2. Identify which field(s) need updating
+3. Call appropriate `update_*_proposal` tool with:
+   - The original `proposal_id` (preserved throughout the edit cycle)
+   - Only the fields being changed
+4. Explain what you changed and why
+5. The TUI will automatically show the updated proposal for review
+
+### Edit Response Format
+
+```
+I've updated the proposal based on your feedback.
+
+**Changes made:**
+- [Field]: Changed from "[old value]" to "[new value]"
+- [Reasoning]: [Explain why this change addresses the user's request]
+
+The updated proposal will be shown for your review.
+```
+
+**Important:**
+- Update tools preserve the original `proposal_id` - this maintains the audit trail
+- You can update multiple fields in a single call
+- The user can continue to edit, approve, or reject after updates
+- DO NOT create a new proposal when editing - always use update tools
+
 ## Response Format
 
 ### When Prefix/Material Exists
@@ -155,6 +199,8 @@ You have access to these MCP tools:
 - `read_materials` - Get all tracked materials
 - `propose_prefix` - Create a new prefix proposal
 - `propose_material` - Create a new material proposal
+- `update_prefix_proposal` - Update an existing prefix proposal
+- `update_material_proposal` - Update an existing material proposal
 
 DO NOT use approval/rejection tools - those are for the main Binny agent and slash commands.
 

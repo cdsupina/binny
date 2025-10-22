@@ -88,6 +88,7 @@ class BinnyApp(App):
         part_namer_system_prompt: str,
         inventory_manager_system_prompt: str,
         mmc_searcher_system_prompt: str,
+        edit_assistant_system_prompt: str,
         inventory_dir: str,
         debug_enabled: bool = False,
     ):
@@ -96,6 +97,7 @@ class BinnyApp(App):
         self.part_namer_system_prompt = part_namer_system_prompt
         self.inventory_manager_system_prompt = inventory_manager_system_prompt
         self.mmc_searcher_system_prompt = mmc_searcher_system_prompt
+        self.edit_assistant_system_prompt = edit_assistant_system_prompt
         self.inventory_dir = inventory_dir
         self.debug_enabled = debug_enabled
         self.client = None
@@ -140,6 +142,8 @@ class BinnyApp(App):
                 "mcp__part_namer__approve_material",
                 "mcp__part_namer__reject_prefix",
                 "mcp__part_namer__reject_material",
+                "mcp__part_namer__update_prefix_proposal",
+                "mcp__part_namer__update_material_proposal",
                 "mcp__part_namer__list_prefix_proposals",
                 "mcp__part_namer__list_material_proposals",
                 "mcp__part_namer__read_prefixes",
@@ -157,6 +161,8 @@ class BinnyApp(App):
                         "mcp__part_namer__read_materials",
                         "mcp__part_namer__propose_prefix",
                         "mcp__part_namer__propose_material",
+                        "mcp__part_namer__update_prefix_proposal",
+                        "mcp__part_namer__update_material_proposal",
                     ],
                 ),
                 "mmc-searcher": AgentDefinition(
@@ -357,38 +363,37 @@ class BinnyApp(App):
         """
         chat_view = self.query_one(ChatView)
 
-        # Process each action
+        # Process approve/reject actions first
         approved = []
         rejected = []
         deferred = []
-        edited = []
+        edit_proposals = []  # Store proposals marked for editing
 
         for index, action in actions.items():
             if index >= len(all_proposals):
                 continue
 
             prop_type, prop_data = all_proposals[index]
+            prop_name = prop_data.get('prefix') or prop_data.get('material_code')
 
             if action == "approve":
                 await self.approve_proposal(prop_data, prop_type)
-                approved.append(f"{prop_type}:{prop_data.get('prefix') or prop_data.get('material_code')}")
+                approved.append(f"{prop_type}:{prop_name}")
             elif action == "reject":
                 await self.reject_proposal(prop_data, prop_type)
-                rejected.append(f"{prop_type}:{prop_data.get('prefix') or prop_data.get('material_code')}")
+                rejected.append(f"{prop_type}:{prop_name}")
             elif action == "defer":
-                deferred.append(f"{prop_type}:{prop_data.get('prefix') or prop_data.get('material_code')}")
+                deferred.append(f"{prop_type}:{prop_name}")
             elif action == "edit":
-                await self.reject_proposal(prop_data, prop_type)
-                edited.append(f"{prop_type}:{prop_data.get('prefix') or prop_data.get('material_code')}")
+                # Store for sequential editing
+                edit_proposals.append((prop_type, prop_data, prop_name))
 
-        # Show summary
+        # Show summary of approve/reject actions
         summary = []
         if approved:
             summary.append(f"✓ Approved: {', '.join(approved)}")
         if rejected:
             summary.append(f"✗ Rejected: {', '.join(rejected)}")
-        if edited:
-            summary.append(f"✎ Marked for edit: {', '.join(edited)}")
         if deferred:
             summary.append(f"⊙ Deferred: {', '.join(deferred)}")
 
@@ -398,9 +403,24 @@ class BinnyApp(App):
             summary.append(f"⊙ {unprocessed_count} proposal(s) left without action (deferred)")
 
         if summary:
-            chat_view.add_system_message("Batch review complete:\n" + "\n".join(summary))
-        else:
+            chat_view.add_system_message("Batch actions:\n" + "\n".join(summary))
+
+        # Process edit proposals sequentially
+        if edit_proposals:
+            chat_view.add_system_message(
+                f"\nProcessing {len(edit_proposals)} proposal(s) marked for editing..."
+            )
+
+            for prop_type, prop_data, prop_name in edit_proposals:
+                # Open edit modal for each proposal
+                # This will block until user clicks Apply or Cancel
+                await self.edit_proposal(prop_data, prop_type)
+
+        # Final summary
+        if not summary and not edit_proposals:
             chat_view.add_system_message("No actions were selected.")
+        elif edit_proposals:
+            chat_view.add_system_message(f"Finished processing {len(edit_proposals)} edit session(s).")
 
     async def approve_proposal(self, proposal_data: dict, proposal_type: str) -> None:
         """Approve a proposal by calling the appropriate MCP tool."""
@@ -429,16 +449,28 @@ class BinnyApp(App):
             await reject_material_tool.handler({"proposal_id": proposal_id})
 
     async def edit_proposal(self, proposal_data: dict, proposal_type: str) -> None:
-        """Handle editing a proposal - reject it and prompt for changes."""
-        # First reject the old proposal
-        await self.reject_proposal(proposal_data, proposal_type)
+        """Handle editing a proposal - open edit modal with mini-chat."""
+        from .edit_proposal_modal import EditProposalModal
 
-        chat_view = self.query_one(ChatView)
-        chat_view.add_system_message(
-            f"Old proposal rejected. Please describe the changes you'd like to the {proposal_type}."
+        # Open the edit modal
+        result = await self.push_screen_wait(
+            EditProposalModal(
+                proposal_data,
+                proposal_type,
+                self.edit_assistant_system_prompt
+            )
         )
 
-        # The user can now type their changes, and the agent will create a new proposal
+        chat_view = self.query_one(ChatView)
+
+        # Handle result
+        if result is None:
+            # User cancelled
+            chat_view.add_system_message("Editing cancelled.")
+        else:
+            # User applied changes - result is the updated proposal
+            # Show the updated proposal in the review modal
+            await self.show_proposal_modal(result, proposal_type)
 
 
     def action_toggle_debug(self) -> None:

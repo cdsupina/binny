@@ -110,6 +110,92 @@ def remove_material_proposal(proposal_id: str) -> bool:
     return True
 
 
+def update_prefix_proposal_in_file(proposal_id: str, updates: dict) -> PrefixProposal | None:
+    """Update a prefix proposal by ID with new field values.
+
+    Args:
+        proposal_id: ID of proposal to update
+        updates: Dict of fields to update (prefix, description, format_template, reasoning)
+
+    Returns:
+        Updated proposal if found, None otherwise
+    """
+    if not PREFIX_PROPOSALS_FILE.exists():
+        return None
+
+    proposals = load_prefix_proposals()
+    updated_proposal = None
+
+    for proposal in proposals:
+        if proposal['proposal_id'] == proposal_id:
+            # Update fields
+            if 'prefix' in updates:
+                proposal['prefix'] = updates['prefix']
+            if 'description' in updates:
+                proposal['description'] = updates['description']
+            if 'format_template' in updates:
+                proposal['format_template'] = updates['format_template']
+            if 'reasoning' in updates:
+                proposal['reasoning'] = updates['reasoning']
+
+            # Update timestamp
+            proposal['timestamp'] = datetime.now().isoformat()
+            updated_proposal = proposal
+            break
+
+    if not updated_proposal:
+        return None
+
+    # Write back all proposals
+    with open(PREFIX_PROPOSALS_FILE, 'w') as f:
+        for proposal in proposals:
+            f.write(json.dumps(proposal) + '\n')
+
+    return updated_proposal
+
+
+def update_material_proposal_in_file(proposal_id: str, updates: dict) -> MaterialProposal | None:
+    """Update a material proposal by ID with new field values.
+
+    Args:
+        proposal_id: ID of proposal to update
+        updates: Dict of fields to update (material_code, description, reasoning)
+
+    Returns:
+        Updated proposal if found, None otherwise
+    """
+    if not MATERIAL_PROPOSALS_FILE.exists():
+        return None
+
+    proposals = load_material_proposals()
+    updated_proposal = None
+
+    for proposal in proposals:
+        if proposal['proposal_id'] == proposal_id:
+            # Update fields
+            if 'material_code' in updates:
+                proposal['material_code'] = updates['material_code']
+            if 'description' in updates:
+                proposal['description'] = updates['description']
+            if 'reasoning' in updates:
+                proposal['reasoning'] = updates['reasoning']
+
+            # Update timestamp
+            proposal['timestamp'] = datetime.now().isoformat()
+            updated_proposal = proposal
+            break
+
+    if not updated_proposal:
+        return None
+
+    # Write back all proposals
+    with open(MATERIAL_PROPOSALS_FILE, 'w') as f:
+        for proposal in proposals:
+            f.write(json.dumps(proposal) + '\n')
+
+    return updated_proposal
+
+
 # Define tools using the @tool decorator
 
 @tool("read_prefixes", "Read all prefixes from the prefixes file", {})
@@ -326,6 +412,117 @@ async def reject_material_tool(args: dict[str, Any]) -> dict:
         }
 
 
+@tool(
+    "update_prefix_proposal",
+    "Update an existing prefix proposal with new field values",
+    {
+        "proposal_id": str,
+        "prefix": (str, False),
+        "description": (str, False),
+        "format_template": (str, False),
+        "reasoning": (str, False),
+    }
+)
+async def update_prefix_tool(args: dict[str, Any]) -> dict:
+    """Update an existing prefix proposal."""
+    proposal_id = args["proposal_id"]
+
+    # Build updates dict from provided fields
+    updates = {}
+    if "prefix" in args:
+        updates["prefix"] = args["prefix"]
+    if "description" in args:
+        updates["description"] = args["description"]
+    if "format_template" in args:
+        updates["format_template"] = args["format_template"]
+    if "reasoning" in args:
+        updates["reasoning"] = args["reasoning"]
+
+    if not updates:
+        return {
+            "content": [
+                {"type": "text", "text": "Error: No fields provided to update"}
+            ]
+        }
+
+    updated_proposal = update_prefix_proposal_in_file(proposal_id, updates)
+
+    if not updated_proposal:
+        return {
+            "content": [
+                {"type": "text", "text": f"Error: Proposal {proposal_id} not found"}
+            ]
+        }
+
+    # Return in same format as propose_prefix
+    return {
+        "content": [
+            {
+                "type": "text",
+                "text": json.dumps({
+                    "type": "proposal",
+                    "proposal_type": "prefix",
+                    "data": updated_proposal
+                }, indent=2)
+            }
+        ]
+    }
+
+
+@tool(
+    "update_material_proposal",
+    "Update an existing material proposal with new field values",
+    {
+        "proposal_id": str,
+        "material_code": (str, False),
+        "description": (str, False),
+        "reasoning": (str, False),
+    }
+)
+async def update_material_tool(args: dict[str, Any]) -> dict:
+    """Update an existing material proposal."""
+    proposal_id = args["proposal_id"]
+
+    # Build updates dict from provided fields
+    updates = {}
+    if "material_code" in args:
+        updates["material_code"] = args["material_code"]
+    if "description" in args:
+        updates["description"] = args["description"]
+    if "reasoning" in args:
+        updates["reasoning"] = args["reasoning"]
+
+    if not updates:
+        return {
+            "content": [
+                {"type": "text", "text": "Error: No fields provided to update"}
+            ]
+        }
+
+    updated_proposal = update_material_proposal_in_file(proposal_id, updates)
+
+    if not updated_proposal:
+        return {
+            "content": [
+                {"type": "text", "text": f"Error: Proposal {proposal_id} not found"}
+            ]
+        }
+
+    # Return in same format as propose_material
+    return {
+        "content": [
+            {
+                "type": "text",
+                "text": json.dumps({
+                    "type": "proposal",
+                    "proposal_type": "material",
+                    "data": updated_proposal
+                }, indent=2)
+            }
+        ]
+    }
+
+
 @tool("list_prefix_proposals", "List all pending prefix proposals", {})
 async def list_prefix_proposals_tool(args: dict[str, Any]) -> dict:
     """List all pending prefix proposals."""
@@ -374,6 +571,8 @@ PART_NAMER_TOOLS = [
     approve_material_tool,
     reject_prefix_tool,
     reject_material_tool,
+    update_prefix_tool,
+    update_material_tool,
     list_prefix_proposals_tool,
     list_material_proposals_tool,
 ]

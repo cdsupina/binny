@@ -39,12 +39,18 @@ async def async_main():
     )
     mmc_searcher_system_prompt = mmc_searcher_system_prompt_path.read_text().strip()
 
+    edit_assistant_system_prompt_path = (
+        Path(__file__).parent / "system_prompts/edit_assistant_prompt.md"
+    )
+    edit_assistant_system_prompt = edit_assistant_system_prompt_path.read_text().strip()
+
     # Create and run the TUI app
     app = BinnyApp(
         binny_system_prompt=binny_system_prompt,
         part_namer_system_prompt=part_namer_system_prompt,
         inventory_manager_system_prompt=inventory_manager_system_prompt,
         mmc_searcher_system_prompt=mmc_searcher_system_prompt,
+        edit_assistant_system_prompt=edit_assistant_system_prompt,
         inventory_dir=inventory_dir,
         debug_enabled=debug_enabled,
     )
