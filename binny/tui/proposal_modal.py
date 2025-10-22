@@ -11,8 +11,6 @@ from textual.widgets import Markdown as MarkdownWidget
 from textual.containers import Container, Horizontal, Vertical
 from textual.binding import Binding
 from textual.reactive import reactive
-from rich.panel import Panel
-from rich.markdown import Markdown
 
 
 class ProposalModal(ModalScreen[str]):
@@ -39,14 +37,13 @@ class ProposalModal(ModalScreen[str]):
         width: 100%;
         height: 100%;
         align: center middle;
+        padding: 0 2;
     }
 
     #proposal-container {
-        width: 90;
+        width: 50%;
         min-width: 40;
-        height: auto;
-        min-height: 20;
-        max-height: 90%;
+        height: 90%;
         background: $surface;
         border: round $accent;
         padding: 1;
@@ -54,13 +51,11 @@ class ProposalModal(ModalScreen[str]):
 
     /* When reference is shown, adjust proposal container */
     ProposalModal.show-reference #main-layout {
-        align: left top;
+        align: left middle;
     }
 
     ProposalModal.show-reference #proposal-container {
-        width: 50%;
-        min-width: 30;
-        max-width: 50%;
+        margin-right: 2;
     }
 
     /* Reference container - hidden by default */
@@ -74,9 +69,8 @@ class ProposalModal(ModalScreen[str]):
         width: 50%;
         min-width: 30;
         max-width: 50%;
-        height: auto;
-        min-height: 20;
-        max-height: 90%;
+        height: 90%;
+        margin-left: 3;
         background: $surface;
         border: round $accent;
         padding: 1;
@@ -92,9 +86,7 @@ class ProposalModal(ModalScreen[str]):
 
     #reference-markdown {
         width: 100%;
-        height: auto;
-        min-height: 20;
-        max-height: 50;
+        height: 1fr;
         overflow-y: auto;
         margin-bottom: 1;
         background: $panel;
@@ -154,8 +146,7 @@ class ProposalModal(ModalScreen[str]):
 
     #proposal-content {
         width: 100%;
-        height: auto;
-        max-height: 15;
+        height: 1fr;
         overflow-y: auto;
         margin-bottom: 1;
         padding: 1;
@@ -242,7 +233,7 @@ class ProposalModal(ModalScreen[str]):
         """Compose the modal content."""
         with Horizontal(id="main-layout"):
             # Left side: Proposal container
-            with Container(id="proposal-container"):
+            with Vertical(id="proposal-container"):
                 # Show proposal counter if multiple proposals
                 if len(self.all_proposals) > 1:
                     yield Static(
@@ -253,7 +244,7 @@ class ProposalModal(ModalScreen[str]):
                         self._format_header(),
                         id="proposal-header"
                     )
-                yield Static(Markdown(self._format_proposal()), id="proposal-content")
+                yield MarkdownWidget(self._format_proposal(), id="proposal-content")
                 with Container(id="button-container"):
                     with Horizontal():
                         yield Button("Approve", id="approve", variant="success")
@@ -275,7 +266,7 @@ class ProposalModal(ModalScreen[str]):
                     )
 
             # Right side: Reference viewer container
-            with Container(id="reference-container"):
+            with Vertical(id="reference-container"):
                 yield Static(
                     "",
                     id="reference-header"
@@ -503,8 +494,8 @@ class ProposalModal(ModalScreen[str]):
             pass
 
         # Update the proposal content
-        content_widget = self.query_one("#proposal-content", Static)
-        content_widget.update(Markdown(self._format_proposal()))
+        content_widget = self.query_one("#proposal-content", MarkdownWidget)
+        content_widget.update(self._format_proposal())
 
         # Update action button states
         self.update_action_buttons()
