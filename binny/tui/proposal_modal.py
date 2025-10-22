@@ -1,10 +1,16 @@
 """Proposal modal for interactive approval workflow."""
 
+import os
+import re
+from pathlib import Path
+
 from textual.app import ComposeResult
 from textual.screen import ModalScreen
-from textual.widgets import Button, Static, Label
+from textual.widgets import Button, Static, Label, Input
+from textual.widgets import Markdown as MarkdownWidget
 from textual.containers import Container, Horizontal, Vertical
 from textual.binding import Binding
+from textual.reactive import reactive
 from rich.panel import Panel
 from rich.markdown import Markdown
 
@@ -14,7 +20,13 @@ class ProposalModal(ModalScreen[str]):
 
     BINDINGS = [
         Binding("escape", "dismiss_defer", "Defer", show=False),
+        Binding("r", "toggle_reference", "Reference", show=True),
+        Binding("ctrl+f", "toggle_search", "Find", show=True),
     ]
+
+    # Reactive attributes for reference viewer
+    show_reference: reactive[bool] = reactive(False)
+    show_search: reactive[bool] = reactive(False)
 
     DEFAULT_CSS = """
     ProposalModal {
@@ -23,13 +35,105 @@ class ProposalModal(ModalScreen[str]):
         outline: none;
     }
 
+    #main-layout {
+        width: 100%;
+        height: 100%;
+        align: center middle;
+    }
+
     #proposal-container {
         width: 90;
+        min-width: 40;
         height: auto;
+        min-height: 20;
         max-height: 90%;
         background: $surface;
         border: round $accent;
         padding: 1;
+    }
+
+    /* When reference is shown, adjust proposal container */
+    ProposalModal.show-reference #main-layout {
+        align: left top;
+    }
+
+    ProposalModal.show-reference #proposal-container {
+        width: 50%;
+        min-width: 30;
+        max-width: 50%;
+    }
+
+    /* Reference container - hidden by default */
+    #reference-container {
+        display: none;
+    }
+
+    /* When reference is shown, display it */
+    ProposalModal.show-reference #reference-container {
+        display: block;
+        width: 50%;
+        min-width: 30;
+        max-width: 50%;
+        height: auto;
+        min-height: 20;
+        max-height: 90%;
+        background: $surface;
+        border: round $accent;
+        padding: 1;
+    }
+
+    #reference-header {
+        width: 100%;
+        text-align: center;
+        margin-bottom: 1;
+        color: $accent;
+        height: auto;
+    }
+
+    #reference-markdown {
+        width: 100%;
+        height: auto;
+        min-height: 20;
+        max-height: 50;
+        overflow-y: auto;
+        margin-bottom: 1;
+        background: $panel;
+        padding: 1;
+    }
+
+    #match-counter {
+        display: none;
+        width: 100%;
+        text-align: right;
+        color: $text-muted;
+        margin-bottom: 1;
+        height: auto;
+    }
+
+    #reference-search {
+        display: none;
+        width: 100%;
+        margin-bottom: 0;
+        height: auto;
+    }
+
+    #reference-shortcuts {
+        width: 100%;
+        text-align: center;
+        color: $text-muted;
+        border-top: solid $primary;
+        padding-top: 1;
+        margin-top: 1;
+        height: auto;
+    }
+
+    /* Show search box and match counter when search is active */
+    ProposalModal.show-search #match-counter {
+        display: block;
+    }
+
+    ProposalModal.show-search #reference-search {
+        display: block;
     }
 
     #proposal-header {
@@ -62,7 +166,6 @@ class ProposalModal(ModalScreen[str]):
         width: 100%;
         height: auto;
         align: center middle;
-        margin-bottom: 1;
     }
 
     #button-container Horizontal {
@@ -103,6 +206,7 @@ class ProposalModal(ModalScreen[str]):
         color: $text-muted;
         border-top: solid $primary;
         padding-top: 1;
+        margin-top: 1;
     }
     """
 
@@ -128,34 +232,63 @@ class ProposalModal(ModalScreen[str]):
         self.current_index = current_index
         # Track actions for each proposal (index -> action)
         self.proposal_actions: dict[int, str] = {}
+        # Reference viewer state
+        self.reference_matches: list[dict] = []
+        self.current_match_index: int = 0
+        self.reference_content: str = ""
+        self.reference_title: str = ""
 
     def compose(self) -> ComposeResult:
         """Compose the modal content."""
-        with Container(id="proposal-container"):
-            # Show proposal counter if multiple proposals
-            if len(self.all_proposals) > 1:
+        with Horizontal(id="main-layout"):
+            # Left side: Proposal container
+            with Container(id="proposal-container"):
+                # Show proposal counter if multiple proposals
+                if len(self.all_proposals) > 1:
+                    yield Static(
+                        self._format_decision_summary(),
+                        id="decision-summary"
+                    )
+                    yield Static(
+                        self._format_header(),
+                        id="proposal-header"
+                    )
+                yield Static(Markdown(self._format_proposal()), id="proposal-content")
+                with Container(id="button-container"):
+                    with Horizontal():
+                        yield Button("Approve", id="approve", variant="success")
+                        yield Button("Reject", id="reject", variant="error")
+                        yield Button("Edit", id="edit", variant="warning")
+                        # Confirm button for multiple proposals
+                        if len(self.all_proposals) > 1:
+                            yield Button("Confirm", id="confirm-button", variant="primary")
+                # Footer with shortcuts
+                if len(self.all_proposals) > 1:
+                    yield Static(
+                        "↑↓: Navigate | Tab/←→: Select | Space/Enter: Mark | R: Reference | Esc: Cancel",
+                        id="shortcuts-footer"
+                    )
+                else:
+                    yield Static(
+                        "R: Reference | Esc: Defer",
+                        id="shortcuts-footer"
+                    )
+
+            # Right side: Reference viewer container
+            with Container(id="reference-container"):
                 yield Static(
-                    self._format_decision_summary(),
-                    id="decision-summary"
+                    "",
+                    id="reference-header"
+                )
+                yield MarkdownWidget("", id="reference-markdown")
+                yield Static("", id="match-counter")
+                yield Input(
+                    placeholder="Search...",
+                    id="reference-search"
                 )
                 yield Static(
-                    self._format_header(),
-                    id="proposal-header"
-                )
-            yield Static(Markdown(self._format_proposal()), id="proposal-content")
-            with Container(id="button-container"):
-                with Horizontal():
-                    yield Button("Approve", id="approve", variant="success")
-                    yield Button("Reject", id="reject", variant="error")
-                    yield Button("Edit", id="edit", variant="warning")
-                    # Confirm button for multiple proposals
-                    if len(self.all_proposals) > 1:
-                        yield Button("Confirm", id="confirm-button", variant="primary")
-            # Footer with shortcuts for multiple proposals
-            if len(self.all_proposals) > 1:
-                yield Static(
-                    "↑↓: Navigate | Tab/←→: Select | Space/Enter: Mark | Esc: Cancel All",
-                    id="shortcuts-footer"
+                    "Ctrl+F: Find | Ctrl+J: Next | Ctrl+K: Prev",
+                    id="reference-shortcuts"
                 )
 
     def _format_header(self) -> str:
@@ -349,6 +482,9 @@ class ProposalModal(ModalScreen[str]):
 
     def update_proposal(self) -> None:
         """Update the modal to show the current proposal."""
+        # Store previous type to detect changes
+        previous_type = self.proposal_type
+
         # Get the current proposal
         self.proposal_type, self.proposal_data = self.all_proposals[self.current_index]
 
@@ -372,6 +508,10 @@ class ProposalModal(ModalScreen[str]):
 
         # Update action button states
         self.update_action_buttons()
+
+        # If reference panel is shown and proposal type changed, reload the reference file
+        if self.show_reference and previous_type != self.proposal_type:
+            self.load_reference_file()
 
     def key_left(self) -> None:
         """Move focus to previous button with left arrow."""
@@ -411,3 +551,244 @@ class ProposalModal(ModalScreen[str]):
         else:
             # For multiple proposals, cancel the entire batch review
             self.dismiss(None)
+
+    def action_toggle_reference(self) -> None:
+        """Toggle reference viewer panel."""
+        self.show_reference = not self.show_reference
+
+    def watch_show_reference(self, show: bool) -> None:
+        """Update UI when reference panel visibility changes."""
+        # Update CSS classes
+        if show:
+            self.add_class("show-reference")
+            # Load the reference file
+            self.load_reference_file()
+        else:
+            self.remove_class("show-reference")
+            # Hide search when closing reference panel
+            self.show_search = False
+
+    def action_toggle_search(self) -> None:
+        """Toggle search box visibility (only works when reference is shown)."""
+        # Only allow search if reference is shown
+        if self.show_reference:
+            self.show_search = not self.show_search
+
+    def watch_show_search(self, show: bool) -> None:
+        """Update UI when search box visibility changes."""
+        if show:
+            self.add_class("show-search")
+            # Focus the search input
+            try:
+                search_input = self.query_one("#reference-search", Input)
+                search_input.focus()
+            except:
+                pass
+        else:
+            self.remove_class("show-search")
+            # Clear search and reset view
+            try:
+                search_input = self.query_one("#reference-search", Input)
+                search_input.value = ""
+                # Reset to full content view
+                self._update_reference_ui(
+                    self.reference_title,
+                    self.reference_content,
+                    ""
+                )
+                self.reference_matches = []
+            except:
+                pass
+            # Return focus to approve button
+            try:
+                approve_button = self.query_one("#approve", Button)
+                approve_button.focus()
+            except:
+                pass
+
+    def load_reference_file(self) -> None:
+        """Load appropriate markdown file based on proposal type."""
+        # Determine which env variable to use
+        if self.proposal_type == "prefix":
+            env_var = "BINNY_PREFIXES_FILE"
+            title = "Prefixes Reference"
+        else:
+            env_var = "BINNY_MATERIALS_FILE"
+            title = "Materials Reference"
+
+        # Store title for later use
+        self.reference_title = title
+
+        # Get file path from environment
+        file_path_str = os.getenv(env_var)
+
+        if not file_path_str:
+            error_msg = f"# Error\n\nEnvironment variable `{env_var}` is not set."
+            self.reference_content = error_msg
+            self._update_reference_ui(title, error_msg, "")
+            return
+
+        file_path = Path(file_path_str)
+
+        if not file_path.exists():
+            error_msg = f"# Error\n\nFile not found: `{file_path}`"
+            self.reference_content = error_msg
+            self._update_reference_ui(title, error_msg, "")
+            return
+
+        try:
+            content = file_path.read_text()
+            self.reference_content = content
+            self._update_reference_ui(title, content, "")
+            # Parse H2 sections for search
+            self.reference_matches = self.parse_h2_sections(content)
+        except Exception as e:
+            error_msg = f"# Error\n\nFailed to read file: {str(e)}"
+            self.reference_content = error_msg
+            self._update_reference_ui(title, error_msg, "")
+
+    def _update_reference_ui(self, title: str, content: str, match_info: str) -> None:
+        """Update reference viewer UI elements."""
+        try:
+            header = self.query_one("#reference-header", Static)
+            header.update(f"[bold]{title}[/bold]")
+        except:
+            pass
+
+        try:
+            markdown = self.query_one("#reference-markdown", MarkdownWidget)
+            markdown.update(content)
+        except:
+            pass
+
+        try:
+            counter = self.query_one("#match-counter", Static)
+            counter.update(match_info)
+        except:
+            pass
+
+    def parse_h2_sections(self, content: str) -> list[dict]:
+        """Extract H2 sections for searching.
+
+        Returns list of: {'header': 'SHAFT', 'anchor': 'shaft', 'content': '...'}
+        """
+        sections = []
+
+        # Split by H2 headers
+        parts = re.split(r'^## (.+)$', content, flags=re.MULTILINE)
+
+        # parts[0] is content before first H2 (usually empty or H1)
+        # Then alternating: header1, content1, header2, content2, ...
+        for i in range(1, len(parts), 2):
+            if i + 1 < len(parts):
+                header = parts[i].strip()
+                section_content = parts[i + 1].strip()
+
+                # Create anchor (lowercase, spaces to hyphens)
+                anchor = header.lower().replace(' ', '-')
+
+                sections.append({
+                    'header': header,
+                    'anchor': anchor,
+                    'content': section_content
+                })
+
+        return sections
+
+    async def on_input_changed(self, event: Input.Changed) -> None:
+        """Handle search input changes."""
+        # Only handle reference search input
+        if event.input.id != "reference-search":
+            return
+
+        query = event.value.strip().lower()
+
+        if not query:
+            # No search query, show all content
+            self._update_reference_ui(
+                self.reference_title,
+                self.reference_content,
+                ""
+            )
+            return
+
+        # Find all sections matching the query
+        all_sections = self.parse_h2_sections(self.reference_content)
+        matched_sections = [
+            section for section in all_sections
+            if query in section['header'].lower() or query in section['content'].lower()
+        ]
+
+        if not matched_sections:
+            # No matches found
+            self._update_reference_ui(
+                self.reference_title,
+                self.reference_content,
+                "[dim]No matches[/dim]"
+            )
+            self.reference_matches = []
+            return
+
+        # Store matches and jump to first one
+        self.reference_matches = matched_sections
+        self.current_match_index = 0
+        self.navigate_to_match(0)
+
+    def navigate_to_match(self, direction: int) -> None:
+        """Navigate to next/prev match (direction: +1 for next, -1 for prev, 0 for current)."""
+        if not self.reference_matches:
+            return
+
+        # Update index
+        if direction != 0:
+            self.current_match_index = (self.current_match_index + direction) % len(self.reference_matches)
+
+        # Get current match
+        match = self.reference_matches[self.current_match_index]
+
+        # Update match counter
+        match_info = f"Match {self.current_match_index + 1} of {len(self.reference_matches)}"
+        try:
+            counter = self.query_one("#match-counter", Static)
+            counter.update(match_info)
+        except:
+            pass
+
+        # Jump to anchor
+        try:
+            markdown = self.query_one("#reference-markdown", MarkdownWidget)
+            markdown.goto_anchor(match['anchor'])
+        except Exception:
+            pass
+
+    async def on_key(self, event) -> None:
+        """Handle keyboard shortcuts globally and for search navigation."""
+        # Handle Ctrl+F globally - toggle search when reference is open
+        if event.key == "ctrl+f":
+            if self.show_reference:
+                self.show_search = not self.show_search
+                event.prevent_default()
+                event.stop()
+            return
+
+        # Handle Ctrl+J and Ctrl+K for navigating search results
+        if event.key == "ctrl+j":
+            if self.reference_matches and self.show_search:
+                self.navigate_to_match(1)
+                event.prevent_default()
+                event.stop()
+            return
+        elif event.key == "ctrl+k":
+            if self.reference_matches and self.show_search:
+                self.navigate_to_match(-1)
+                event.prevent_default()
+                event.stop()
+            return
+
+        # Handle Escape when search is focused - close search box
+        focused = self.focused
+        if isinstance(focused, Input) and focused.id == "reference-search":
+            if event.key == "escape":
+                self.show_search = False
+                event.prevent_default()
+                event.stop()
