@@ -1,21 +1,19 @@
-# Part Namer MCP Library
+# Part Namer Module
 
-Utility library for managing part naming with a proposal-based approval workflow.
+Module for managing part naming with a proposal-based approval workflow.
 
 ## Overview
 
-This library provides the core functionality for rigidly tracking part prefixes and materials used in the Binny part naming system. It implements a proposal workflow where new prefixes and materials must be approved before being added to the tracking files.
+This module provides the core functionality for rigidly tracking part prefixes and materials used in the Binny part naming system. It implements a proposal workflow where new prefixes and materials must be approved before being added to the tracking files.
 
-The MCP tools are defined in `part_namer_tools.py` (in the main Binny directory) and run as an **embedded SDK MCP server** within the Binny application process.
+The MCP tools run as an **embedded SDK MCP server** within the Binny application process.
 
 ## Architecture
 
+- **tools.py** - MCP tool definitions (10 tools using `@tool` decorator)
 - **models.py** - TypedDict definitions for proposals and parsed data
 - **file_manager.py** - Parse and write H2-based markdown files
-- **approval_workflow.py** - Rich panel formatting for proposals
-
-**MCP Tools** (defined in `../part_namer_tools.py`):
-- 10 tools using the `@tool` decorator for embedded SDK MCP server
+- **__init__.py** - Public API exports
 
 ## File Format
 

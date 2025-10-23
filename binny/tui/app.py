@@ -22,8 +22,16 @@ from claude_agent_sdk import (
 
 from .chat_view import ChatView
 from .proposal_modal import ProposalModal
-from ..part_namer_tools import PART_NAMER_TOOLS, load_prefix_proposals, load_material_proposals
-from ..part_namer_mcp import __version__ as part_namer_version
+from ..part_namer import (
+    PART_NAMER_TOOLS,
+    load_prefix_proposals,
+    load_material_proposals,
+    approve_prefix_tool,
+    approve_material_tool,
+    reject_prefix_tool,
+    reject_material_tool,
+    __version__ as part_namer_version,
+)
 
 
 class BinnyApp(App):
@@ -431,10 +439,8 @@ class BinnyApp(App):
         # Note: This is a simplified approach - in production you might want
         # to call the MCP tool more directly
         if proposal_type == "prefix":
-            from ..part_namer_tools import approve_prefix_tool
             await approve_prefix_tool.handler({"proposal_id": proposal_id})
         else:
-            from ..part_namer_tools import approve_material_tool
             await approve_material_tool.handler({"proposal_id": proposal_id})
 
     async def reject_proposal(self, proposal_data: dict, proposal_type: str) -> None:
@@ -442,10 +448,8 @@ class BinnyApp(App):
         proposal_id = proposal_data["proposal_id"]
 
         if proposal_type == "prefix":
-            from ..part_namer_tools import reject_prefix_tool
             await reject_prefix_tool.handler({"proposal_id": proposal_id})
         else:
-            from ..part_namer_tools import reject_material_tool
             await reject_material_tool.handler({"proposal_id": proposal_id})
 
     async def edit_proposal(self, proposal_data: dict, proposal_type: str) -> None:

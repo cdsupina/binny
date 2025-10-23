@@ -16,8 +16,7 @@ from claude_agent_sdk import (
 )
 from claude_agent_sdk.client import ClaudeSDKClient
 
-from ..part_namer_tools import PART_NAMER_TOOLS
-from ..part_namer_mcp import __version__ as part_namer_version
+from ..part_namer import PART_NAMER_TOOLS, __version__ as part_namer_version
 
 
 class MiniChatMessage(Static):

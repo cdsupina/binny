@@ -21,10 +21,12 @@ binny/
 ├── binny/                         # Main package
 │   ├── __init__.py
 │   ├── main.py                    # Entry point - launches TUI
-│   ├── part_namer_tools.py        # MCP tools for part naming
-│   ├── part_namer_mcp/            # Utility library for part naming
+│   ├── part_namer/                # Part naming module with MCP tools
+│   │   ├── __init__.py            # Public API exports
+│   │   ├── tools.py               # MCP tool definitions
 │   │   ├── models.py              # TypedDicts for proposals
-│   │   └── file_manager.py        # File I/O for prefixes/materials
+│   │   ├── file_manager.py        # File I/O for prefixes/materials
+│   │   └── README.md              # Module documentation
 │   ├── tui/                       # Textual TUI components
 │   │   ├── __init__.py
 │   │   ├── app.py                 # Main TUI application
@@ -138,17 +140,17 @@ Build system: `hatchling` (configured in `[build-system]` section of pyproject.t
 
 Environment variables are loaded via `python-dotenv` in `main.py`
 
-### Part Namer MCP Server
+### Part Namer Module
 
-The `binny/part_namer_mcp/` directory contains utility code for managing part
-naming with a proposal-based workflow. MCP tools are defined in
-`binny/part_namer_tools.py` and run as an embedded SDK MCP server.
+The `binny/part_namer/` module manages part naming with a proposal-based
+workflow. MCP tools run as an embedded SDK MCP server within the Binny application.
 
 **Architecture:**
 
-- `part_namer_tools.py` - 10 MCP tools using @tool decorator (embedded server)
-- `part_namer_mcp/models.py` - TypedDicts for PrefixProposal and MaterialProposal
-- `part_namer_mcp/file_manager.py` - Parse/write H2-based markdown files
+- `part_namer/tools.py` - 10 MCP tools using @tool decorator (embedded server)
+- `part_namer/models.py` - TypedDicts for PrefixProposal and MaterialProposal
+- `part_namer/file_manager.py` - Parse/write H2-based markdown files
+- `part_namer/__init__.py` - Public API exports
 
 **Workflow:**
 

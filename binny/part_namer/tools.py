@@ -12,11 +12,11 @@ import uuid
 
 from claude_agent_sdk import tool
 
-from .part_namer_mcp.models import (
+from .models import (
     PrefixProposal,
     MaterialProposal,
 )
-from .part_namer_mcp.file_manager import (
+from .file_manager import (
     parse_prefixes_file,
     parse_materials_file,
     append_prefix_to_file,
