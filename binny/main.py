@@ -1,15 +1,17 @@
 from dotenv import load_dotenv
 from pathlib import Path
 import os
+import argparse
 
-from .cli_tools import parse_args
 from .tui.app import BinnyApp
 
 _ = load_dotenv()
 inventory_dir = os.getenv("BINNY_INVENTORY_DIR")
 
 # Parse CLI arguments and set debug mode
-args = parse_args()
+parser = argparse.ArgumentParser()
+parser.add_argument("--debug", "-d", action="store_true", help="Enable debug mode")
+args = parser.parse_args()
 debug_enabled = args.debug
 
 
