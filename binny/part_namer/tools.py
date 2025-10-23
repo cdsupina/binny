@@ -1,13 +1,15 @@
 """Part Namer MCP Tools for embedded SDK MCP server.
 
 Provides tools for managing part prefixes and materials with a proposal workflow.
+Uses a registry pattern and tool factory to eliminate code duplication.
 """
 
 import json
 import os
 from datetime import datetime
 from pathlib import Path
-from typing import Any
+from typing import Any, TypeVar, Generic, Callable
+from enum import Enum
 import uuid
 
 from claude_agent_sdk import tool
@@ -15,6 +17,8 @@ from claude_agent_sdk import tool
 from .models import (
     PrefixProposal,
     MaterialProposal,
+    Prefix,
+    Material,
 )
 from .file_manager import (
     parse_prefixes_file,
@@ -34,534 +38,310 @@ PREFIX_PROPOSALS_FILE = PROPOSALS_DIR / "proposals_prefix.jsonl"
 MATERIAL_PROPOSALS_FILE = PROPOSALS_DIR / "proposals_material.jsonl"
 
 
-def load_prefix_proposals() -> list[PrefixProposal]:
-    """Load all pending prefix proposals from JSONL file."""
-    if not PREFIX_PROPOSALS_FILE.exists():
-        return []
-
-    proposals = []
-    with open(PREFIX_PROPOSALS_FILE, 'r') as f:
-        for line in f:
-            if line.strip():
-                proposals.append(json.loads(line))
-    return proposals
+# Proposal type enumeration
+class ProposalType(Enum):
+    """Types of proposals supported by the system."""
+    PREFIX = "prefix"
+    MATERIAL = "material"
 
 
-def save_prefix_proposal(proposal: PrefixProposal) -> None:
-    """Save a prefix proposal to JSONL file."""
-    PREFIX_PROPOSALS_FILE.parent.mkdir(parents=True, exist_ok=True)
-    with open(PREFIX_PROPOSALS_FILE, 'a') as f:
-        f.write(json.dumps(proposal) + '\n')
+# Generic proposal manager
+T = TypeVar('T', PrefixProposal, MaterialProposal)
 
 
-def remove_prefix_proposal(proposal_id: str) -> bool:
-    """Remove a prefix proposal by ID."""
-    if not PREFIX_PROPOSALS_FILE.exists():
-        return False
+class ProposalManager(Generic[T]):
+    """Generic manager for proposal CRUD operations."""
 
-    proposals = load_prefix_proposals()
-    filtered = [p for p in proposals if p['proposal_id'] != proposal_id]
+    def __init__(
+        self,
+        proposal_type: str,
+        proposals_file: Path,
+        data_file: Path,
+        parse_fn: Callable[[Path], list],
+        append_fn: Callable[[Path, T], bool],
+        id_field: str,  # 'prefix' or 'material_code'
+    ):
+        self.type = proposal_type
+        self.proposals_file = proposals_file
+        self.data_file = data_file
+        self.parse_fn = parse_fn
+        self.append_fn = append_fn
+        self.id_field = id_field
 
-    if len(filtered) == len(proposals):
-        return False
+    def load_proposals(self) -> list[T]:
+        """Load all pending proposals from JSONL file."""
+        if not self.proposals_file.exists():
+            return []
 
-    with open(PREFIX_PROPOSALS_FILE, 'w') as f:
-        for proposal in filtered:
+        proposals = []
+        with open(self.proposals_file, 'r') as f:
+            for line in f:
+                if line.strip():
+                    proposals.append(json.loads(line))
+        return proposals
+
+    def save_proposal(self, proposal: T) -> None:
+        """Save a proposal to JSONL file."""
+        self.proposals_file.parent.mkdir(parents=True, exist_ok=True)
+        with open(self.proposals_file, 'a') as f:
             f.write(json.dumps(proposal) + '\n')
 
-    return True
+    def remove_proposal(self, proposal_id: str) -> bool:
+        """Remove a proposal by ID."""
+        if not self.proposals_file.exists():
+            return False
+
+        proposals = self.load_proposals()
+        filtered = [p for p in proposals if p['proposal_id'] != proposal_id]
+
+        if len(filtered) == len(proposals):
+            return False
+
+        with open(self.proposals_file, 'w') as f:
+            for proposal in filtered:
+                f.write(json.dumps(proposal) + '\n')
+
+        return True
+
+    def update_proposal(self, proposal_id: str, updates: dict) -> T | None:
+        """Update a proposal by ID with new field values."""
+        if not self.proposals_file.exists():
+            return None
+
+        proposals = self.load_proposals()
+        updated_proposal = None
+
+        for proposal in proposals:
+            if proposal['proposal_id'] == proposal_id:
+                # Update fields that are provided
+                for key, value in updates.items():
+                    if key in proposal:
+                        proposal[key] = value
+
+                # Update timestamp
+                proposal['timestamp'] = datetime.now().isoformat()
+                updated_proposal = proposal
+                break
+
+        if not updated_proposal:
+            return None
+
+        # Write back all proposals
+        with open(self.proposals_file, 'w') as f:
+            for proposal in proposals:
+                f.write(json.dumps(proposal) + '\n')
+
+        return updated_proposal
+
+    def approve_proposal(self, proposal_id: str) -> tuple[bool, str, dict | None]:
+        """Approve a proposal and add it to the data file.
+
+        Returns:
+            (success, message, proposal)
+        """
+        proposals = self.load_proposals()
+
+        proposal = next((p for p in proposals if p['proposal_id'] == proposal_id), None)
+        if not proposal:
+            return False, f"Error: Proposal {proposal_id} not found", None
+
+        success = self.append_fn(self.data_file, proposal)
+        if not success:
+            return False, f"Error: Failed to write to {self.type} file", None
+
+        self.remove_proposal(proposal_id)
+
+        item_id = proposal.get(self.id_field, 'unknown')
+        return True, f"✓ {self.type.capitalize()} '{item_id}' approved and added to {self.data_file}", proposal
+
+    def reject_proposal(self, proposal_id: str) -> tuple[bool, str]:
+        """Reject a proposal.
+
+        Returns:
+            (success, message)
+        """
+        success = self.remove_proposal(proposal_id)
+        if not success:
+            return False, f"Error: Proposal {proposal_id} not found"
+        return True, f"✓ {self.type.capitalize()} proposal rejected"
+
+    def read_data(self) -> list:
+        """Read all tracked items from the data file."""
+        return self.parse_fn(self.data_file)
 
 
-def load_material_proposals() -> list[MaterialProposal]:
-    """Load all pending material proposals from JSONL file."""
-    if not MATERIAL_PROPOSALS_FILE.exists():
-        return []
+# Manager configuration registry
+MANAGER_CONFIG = {
+    ProposalType.PREFIX: {
+        "proposals_file": PREFIX_PROPOSALS_FILE,
+        "data_file": PREFIXES_FILE,
+        "parse_fn": parse_prefixes_file,
+        "append_fn": append_prefix_to_file,
+        "id_field": "prefix",
+        "proposal_class": PrefixProposal,
+        "schema": {
+            "prefix": str,
+            "description": str,
+            "format_template": str,
+            "reasoning": str,
+        },
+        "valid_update_fields": {'prefix', 'description', 'format_template', 'reasoning'},
+    },
+    ProposalType.MATERIAL: {
+        "proposals_file": MATERIAL_PROPOSALS_FILE,
+        "data_file": MATERIALS_FILE,
+        "parse_fn": parse_materials_file,
+        "append_fn": append_material_to_file,
+        "id_field": "material_code",
+        "proposal_class": MaterialProposal,
+        "schema": {
+            "material_code": str,
+            "description": str,
+            "reasoning": str,
+        },
+        "valid_update_fields": {'material_code', 'description', 'reasoning'},
+    },
+}
 
-    proposals = []
-    with open(MATERIAL_PROPOSALS_FILE, 'r') as f:
-        for line in f:
-            if line.strip():
-                proposals.append(json.loads(line))
-    return proposals
+# Create manager instances
+MANAGERS = {
+    proposal_type: ProposalManager(
+        proposal_type=proposal_type.value,
+        proposals_file=config["proposals_file"],
+        data_file=config["data_file"],
+        parse_fn=config["parse_fn"],
+        append_fn=config["append_fn"],
+        id_field=config["id_field"],
+    )
+    for proposal_type, config in MANAGER_CONFIG.items()
+}
 
 
-def save_material_proposal(proposal: MaterialProposal) -> None:
-    """Save a material proposal to JSONL file."""
-    MATERIAL_PROPOSALS_FILE.parent.mkdir(parents=True, exist_ok=True)
-    with open(MATERIAL_PROPOSALS_FILE, 'a') as f:
-        f.write(json.dumps(proposal) + '\n')
-
-
-def remove_material_proposal(proposal_id: str) -> bool:
-    """Remove a material proposal by ID."""
-    if not MATERIAL_PROPOSALS_FILE.exists():
-        return False
-
-    proposals = load_material_proposals()
-    filtered = [p for p in proposals if p['proposal_id'] != proposal_id]
-
-    if len(filtered) == len(proposals):
-        return False
-
-    with open(MATERIAL_PROPOSALS_FILE, 'w') as f:
-        for proposal in filtered:
-            f.write(json.dumps(proposal) + '\n')
-
-    return True
-
-
-def update_prefix_proposal_in_file(proposal_id: str, updates: dict) -> PrefixProposal | None:
-    """Update a prefix proposal by ID with new field values.
+def create_tools_for_type(proposal_type: ProposalType) -> dict[str, Any]:
+    """Factory function to create all MCP tools for a proposal type.
 
     Args:
-        proposal_id: ID of proposal to update
-        updates: Dict of fields to update (prefix, description, format_template, reasoning)
+        proposal_type: The type of proposal (PREFIX or MATERIAL)
 
     Returns:
-        Updated proposal if found, None otherwise
+        Dictionary mapping tool names to tool objects
     """
-    if not PREFIX_PROPOSALS_FILE.exists():
-        return None
+    manager = MANAGERS[proposal_type]
+    config = MANAGER_CONFIG[proposal_type]
+    type_name = proposal_type.value
 
-    proposals = load_prefix_proposals()
-    updated_proposal = None
+    # Read tool
+    @tool(f"read_{type_name}s", f"Read all {type_name}s from the {type_name}s file", {})
+    async def read_tool(args: dict[str, Any]) -> dict:
+        items = manager.read_data()
+        return {"content": [{"type": "text", "text": json.dumps(items, indent=2)}]}
 
-    for proposal in proposals:
-        if proposal['proposal_id'] == proposal_id:
-            # Update fields
-            if 'prefix' in updates:
-                proposal['prefix'] = updates['prefix']
-            if 'description' in updates:
-                proposal['description'] = updates['description']
-            if 'format_template' in updates:
-                proposal['format_template'] = updates['format_template']
-            if 'reasoning' in updates:
-                proposal['reasoning'] = updates['reasoning']
-
-            # Update timestamp
-            proposal['timestamp'] = datetime.now().isoformat()
-            updated_proposal = proposal
-            break
-
-    if not updated_proposal:
-        return None
-
-    # Write back all proposals
-    with open(PREFIX_PROPOSALS_FILE, 'w') as f:
-        for proposal in proposals:
-            f.write(json.dumps(proposal) + '\n')
-
-    return updated_proposal
-
-
-def update_material_proposal_in_file(proposal_id: str, updates: dict) -> MaterialProposal | None:
-    """Update a material proposal by ID with new field values.
-
-    Args:
-        proposal_id: ID of proposal to update
-        updates: Dict of fields to update (material_code, description, reasoning)
-
-    Returns:
-        Updated proposal if found, None otherwise
-    """
-    if not MATERIAL_PROPOSALS_FILE.exists():
-        return None
-
-    proposals = load_material_proposals()
-    updated_proposal = None
-
-    for proposal in proposals:
-        if proposal['proposal_id'] == proposal_id:
-            # Update fields
-            if 'material_code' in updates:
-                proposal['material_code'] = updates['material_code']
-            if 'description' in updates:
-                proposal['description'] = updates['description']
-            if 'reasoning' in updates:
-                proposal['reasoning'] = updates['reasoning']
-
-            # Update timestamp
-            proposal['timestamp'] = datetime.now().isoformat()
-            updated_proposal = proposal
-            break
-
-    if not updated_proposal:
-        return None
-
-    # Write back all proposals
-    with open(MATERIAL_PROPOSALS_FILE, 'w') as f:
-        for proposal in proposals:
-            f.write(json.dumps(proposal) + '\n')
-
-    return updated_proposal
-
-
-# Define tools using the @tool decorator
-
-@tool("read_prefixes", "Read all prefixes from the prefixes file", {})
-async def read_prefixes_tool(args: dict[str, Any]) -> dict:
-    """Read all tracked prefixes."""
-    prefixes = parse_prefixes_file(PREFIXES_FILE)
-    return {
-        "content": [
-            {"type": "text", "text": json.dumps(prefixes, indent=2)}
-        ]
-    }
-
-
-@tool("read_materials", "Read all materials from the materials file", {})
-async def read_materials_tool(args: dict[str, Any]) -> dict:
-    """Read all tracked materials."""
-    materials = parse_materials_file(MATERIALS_FILE)
-    return {
-        "content": [
-            {"type": "text", "text": json.dumps(materials, indent=2)}
-        ]
-    }
-
-
-@tool(
-    "propose_prefix",
-    "Create a new prefix proposal",
-    {
-        "prefix": str,
-        "description": str,
-        "format_template": str,
-        "reasoning": str,
-    }
-)
-async def propose_prefix_tool(args: dict[str, Any]) -> dict:
-    """Create a new prefix proposal."""
-    proposal_id = f"prefix_{uuid.uuid4().hex[:8]}"
-    proposal = PrefixProposal(
-        prefix=args["prefix"],
-        description=args["description"],
-        format_template=args["format_template"],
-        reasoning=args["reasoning"],
-        timestamp=datetime.now().isoformat(),
-        proposal_id=proposal_id,
-        status="pending",
-    )
-    save_prefix_proposal(proposal)
-
-    return {
-        "content": [
-            {
+    # Propose tool
+    @tool(f"propose_{type_name}", f"Create a new {type_name} proposal", config["schema"])
+    async def propose_tool(args: dict[str, Any]) -> dict:
+        proposal_id = f"{type_name}_{uuid.uuid4().hex[:8]}"
+        proposal = config["proposal_class"](
+            **args,
+            timestamp=datetime.now().isoformat(),
+            proposal_id=proposal_id,
+            status="pending",
+        )
+        manager.save_proposal(proposal)
+        return {
+            "content": [{
                 "type": "text",
                 "text": json.dumps({
                     "type": "proposal",
-                    "proposal_type": "prefix",
+                    "proposal_type": type_name,
                     "data": proposal
                 }, indent=2)
-            }
-        ]
-    }
+            }]
+        }
 
+    # Approve tool
+    @tool(f"approve_{type_name}", f"Approve a {type_name} proposal and add it to the {type_name}s file", {"proposal_id": str})
+    async def approve_tool(args: dict[str, Any]) -> dict:
+        success, message, _ = manager.approve_proposal(args["proposal_id"])
+        return {"content": [{"type": "text", "text": message}]}
 
-@tool(
-    "propose_material",
-    "Create a new material proposal",
-    {
-        "material_code": str,
-        "description": str,
-        "reasoning": str,
-    }
-)
-async def propose_material_tool(args: dict[str, Any]) -> dict:
-    """Create a new material proposal."""
-    proposal_id = f"material_{uuid.uuid4().hex[:8]}"
-    proposal = MaterialProposal(
-        material_code=args["material_code"],
-        description=args["description"],
-        reasoning=args["reasoning"],
-        timestamp=datetime.now().isoformat(),
-        proposal_id=proposal_id,
-        status="pending",
+    # Reject tool
+    @tool(f"reject_{type_name}", f"Reject a {type_name} proposal", {"proposal_id": str})
+    async def reject_tool(args: dict[str, Any]) -> dict:
+        success, message = manager.reject_proposal(args["proposal_id"])
+        return {"content": [{"type": "text", "text": message}]}
+
+    # Update tool
+    @tool(
+        f"update_{type_name}_proposal",
+        f"Update a {type_name} proposal with new field values",
+        {"proposal_id": str, "updates": dict}
     )
-    save_material_proposal(proposal)
+    async def update_tool(args: dict[str, Any]) -> dict:
+        proposal_id = args["proposal_id"]
+        updates = args["updates"]
 
-    return {
-        "content": [
-            {
-                "type": "text",
-                "text": json.dumps({
-                    "type": "proposal",
-                    "proposal_type": "material",
-                    "data": proposal
-                }, indent=2)
+        # Validate updates contain only valid fields
+        valid_fields = config["valid_update_fields"]
+        invalid_fields = set(updates.keys()) - valid_fields
+        if invalid_fields:
+            return {
+                "content": [{
+                    "type": "text",
+                    "text": f"Error: Invalid fields in updates: {', '.join(invalid_fields)}"
+                }]
             }
-        ]
-    }
 
+        updated_proposal = manager.update_proposal(proposal_id, updates)
+        if not updated_proposal:
+            return {"content": [{"type": "text", "text": f"Error: Proposal {proposal_id} not found"}]}
 
-@tool(
-    "approve_prefix",
-    "Approve a prefix proposal and add it to the prefixes file",
-    {"proposal_id": str}
-)
-async def approve_prefix_tool(args: dict[str, Any]) -> dict:
-    """Approve a prefix proposal."""
-    proposal_id = args["proposal_id"]
-    proposals = load_prefix_proposals()
-
-    proposal = next((p for p in proposals if p['proposal_id'] == proposal_id), None)
-    if not proposal:
         return {
-            "content": [
-                {"type": "text", "text": f"Error: Proposal {proposal_id} not found"}
-            ]
-        }
-
-    success = append_prefix_to_file(PREFIXES_FILE, proposal)
-    if not success:
-        return {
-            "content": [
-                {"type": "text", "text": "Error: Failed to write to prefixes file"}
-            ]
-        }
-
-    remove_prefix_proposal(proposal_id)
-
-    return {
-        "content": [
-            {"type": "text", "text": f"✓ Prefix '{proposal['prefix']}' approved and added to {PREFIXES_FILE}"}
-        ]
-    }
-
-
-@tool(
-    "approve_material",
-    "Approve a material proposal and add it to the materials file",
-    {"proposal_id": str}
-)
-async def approve_material_tool(args: dict[str, Any]) -> dict:
-    """Approve a material proposal."""
-    proposal_id = args["proposal_id"]
-    proposals = load_material_proposals()
-
-    proposal = next((p for p in proposals if p['proposal_id'] == proposal_id), None)
-    if not proposal:
-        return {
-            "content": [
-                {"type": "text", "text": f"Error: Proposal {proposal_id} not found"}
-            ]
-        }
-
-    success = append_material_to_file(MATERIALS_FILE, proposal)
-    if not success:
-        return {
-            "content": [
-                {"type": "text", "text": "Error: Failed to write to materials file"}
-            ]
-        }
-
-    remove_material_proposal(proposal_id)
-
-    return {
-        "content": [
-            {"type": "text", "text": f"✓ Material '{proposal['material_code']}' approved and added to {MATERIALS_FILE}"}
-        ]
-    }
-
-
-@tool(
-    "reject_prefix",
-    "Reject a prefix proposal",
-    {"proposal_id": str}
-)
-async def reject_prefix_tool(args: dict[str, Any]) -> dict:
-    """Reject a prefix proposal."""
-    proposal_id = args["proposal_id"]
-    success = remove_prefix_proposal(proposal_id)
-
-    if success:
-        return {
-            "content": [
-                {"type": "text", "text": f"✓ Prefix proposal {proposal_id} rejected"}
-            ]
-        }
-    else:
-        return {
-            "content": [
-                {"type": "text", "text": f"Error: Proposal {proposal_id} not found"}
-            ]
-        }
-
-
-@tool(
-    "reject_material",
-    "Reject a material proposal",
-    {"proposal_id": str}
-)
-async def reject_material_tool(args: dict[str, Any]) -> dict:
-    """Reject a material proposal."""
-    proposal_id = args["proposal_id"]
-    success = remove_material_proposal(proposal_id)
-
-    if success:
-        return {
-            "content": [
-                {"type": "text", "text": f"✓ Material proposal {proposal_id} rejected"}
-            ]
-        }
-    else:
-        return {
-            "content": [
-                {"type": "text", "text": f"Error: Proposal {proposal_id} not found"}
-            ]
-        }
-
-
-@tool(
-    "update_prefix_proposal",
-    "Update an existing prefix proposal with new field values",
-    {
-        "proposal_id": str,
-        "prefix": (str, False),
-        "description": (str, False),
-        "format_template": (str, False),
-        "reasoning": (str, False),
-    }
-)
-async def update_prefix_tool(args: dict[str, Any]) -> dict:
-    """Update an existing prefix proposal."""
-    proposal_id = args["proposal_id"]
-
-    # Build updates dict from provided fields
-    updates = {}
-    if "prefix" in args:
-        updates["prefix"] = args["prefix"]
-    if "description" in args:
-        updates["description"] = args["description"]
-    if "format_template" in args:
-        updates["format_template"] = args["format_template"]
-    if "reasoning" in args:
-        updates["reasoning"] = args["reasoning"]
-
-    if not updates:
-        return {
-            "content": [
-                {"type": "text", "text": "Error: No fields provided to update"}
-            ]
-        }
-
-    updated_proposal = update_prefix_proposal_in_file(proposal_id, updates)
-
-    if not updated_proposal:
-        return {
-            "content": [
-                {"type": "text", "text": f"Error: Proposal {proposal_id} not found"}
-            ]
-        }
-
-    # Return in same format as propose_prefix
-    return {
-        "content": [
-            {
+            "content": [{
                 "type": "text",
                 "text": json.dumps({
                     "type": "proposal",
-                    "proposal_type": "prefix",
+                    "proposal_type": type_name,
                     "data": updated_proposal
                 }, indent=2)
-            }
-        ]
-    }
-
-
-@tool(
-    "update_material_proposal",
-    "Update an existing material proposal with new field values",
-    {
-        "proposal_id": str,
-        "material_code": (str, False),
-        "description": (str, False),
-        "reasoning": (str, False),
-    }
-)
-async def update_material_tool(args: dict[str, Any]) -> dict:
-    """Update an existing material proposal."""
-    proposal_id = args["proposal_id"]
-
-    # Build updates dict from provided fields
-    updates = {}
-    if "material_code" in args:
-        updates["material_code"] = args["material_code"]
-    if "description" in args:
-        updates["description"] = args["description"]
-    if "reasoning" in args:
-        updates["reasoning"] = args["reasoning"]
-
-    if not updates:
-        return {
-            "content": [
-                {"type": "text", "text": "Error: No fields provided to update"}
-            ]
+            }]
         }
 
-    updated_proposal = update_material_proposal_in_file(proposal_id, updates)
-
-    if not updated_proposal:
-        return {
-            "content": [
-                {"type": "text", "text": f"Error: Proposal {proposal_id} not found"}
-            ]
-        }
-
-    # Return in same format as propose_material
-    return {
-        "content": [
-            {
-                "type": "text",
-                "text": json.dumps({
-                    "type": "proposal",
-                    "proposal_type": "material",
-                    "data": updated_proposal
-                }, indent=2)
-            }
-        ]
-    }
-
-
-@tool("list_prefix_proposals", "List all pending prefix proposals", {})
-async def list_prefix_proposals_tool(args: dict[str, Any]) -> dict:
-    """List all pending prefix proposals."""
-    proposals = load_prefix_proposals()
-
-    if not proposals:
-        return {
-            "content": [
-                {"type": "text", "text": json.dumps({"proposals": []}, indent=2)}
-            ]
-        }
+    # List tool
+    @tool(f"list_{type_name}_proposals", f"List all pending {type_name} proposals", {})
+    async def list_tool(args: dict[str, Any]) -> dict:
+        proposals = manager.load_proposals()
+        return {"content": [{"type": "text", "text": json.dumps(proposals, indent=2)}]}
 
     return {
-        "content": [
-            {"type": "text", "text": json.dumps({"proposals": proposals}, indent=2)}
-        ]
+        "read": read_tool,
+        "propose": propose_tool,
+        "approve": approve_tool,
+        "reject": reject_tool,
+        "update": update_tool,
+        "list": list_tool,
     }
 
 
-@tool("list_material_proposals", "List all pending material proposals", {})
-async def list_material_proposals_tool(args: dict[str, Any]) -> dict:
-    """List all pending material proposals."""
-    proposals = load_material_proposals()
+# Generate all tools
+_prefix_tools = create_tools_for_type(ProposalType.PREFIX)
+_material_tools = create_tools_for_type(ProposalType.MATERIAL)
 
-    if not proposals:
-        return {
-            "content": [
-                {"type": "text", "text": json.dumps({"proposals": []}, indent=2)}
-            ]
-        }
+# Export individual tool objects (for TUI to call .handler() on them)
+read_prefixes_tool = _prefix_tools["read"]
+propose_prefix_tool = _prefix_tools["propose"]
+approve_prefix_tool = _prefix_tools["approve"]
+reject_prefix_tool = _prefix_tools["reject"]
+update_prefix_tool = _prefix_tools["update"]
+list_prefix_proposals_tool = _prefix_tools["list"]
 
-    return {
-        "content": [
-            {"type": "text", "text": json.dumps({"proposals": proposals}, indent=2)}
-        ]
-    }
+read_materials_tool = _material_tools["read"]
+propose_material_tool = _material_tools["propose"]
+approve_material_tool = _material_tools["approve"]
+reject_material_tool = _material_tools["reject"]
+update_material_tool = _material_tools["update"]
+list_material_proposals_tool = _material_tools["list"]
 
-
-# Export all tool functions for create_sdk_mcp_server
+# Collect all tools for MCP server registration
 PART_NAMER_TOOLS = [
     read_prefixes_tool,
     read_materials_tool,

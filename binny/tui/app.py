@@ -24,8 +24,8 @@ from .chat_view import ChatView
 from .proposal_modal import ProposalModal
 from ..part_namer import (
     PART_NAMER_TOOLS,
-    load_prefix_proposals,
-    load_material_proposals,
+    ProposalType,
+    MANAGERS,
     approve_prefix_tool,
     approve_material_tool,
     reject_prefix_tool,
@@ -494,8 +494,8 @@ class BinnyApp(App):
     async def action_review_proposals(self) -> None:
         """Review all pending proposals via interactive modals."""
         # Load all pending proposals
-        prefix_proposals = load_prefix_proposals()
-        material_proposals = load_material_proposals()
+        prefix_proposals = MANAGERS[ProposalType.PREFIX].load_proposals()
+        material_proposals = MANAGERS[ProposalType.MATERIAL].load_proposals()
 
         all_proposals = [
             ("prefix", p) for p in prefix_proposals
