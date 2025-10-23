@@ -38,50 +38,7 @@ class BinnyApp(App):
     """Binny inventory management TUI application."""
 
     TITLE = "Binny - Inventory Management Assistant"
-
-    CSS = """
-    Screen {
-        background: $surface;
-        overflow-y: hidden;
-    }
-
-    Footer {
-        background: $panel;
-    }
-
-    #main-container {
-        height: 1fr;
-        background: $surface;
-    }
-
-    #chat-container {
-        height: 1fr;
-        padding: 1 2;
-        background: $surface;
-    }
-
-    #input-container {
-        dock: bottom;
-        height: auto;
-        background: $surface;
-        padding: 1 2;
-    }
-
-    Input {
-        width: 100%;
-        background: $surface;
-        border: solid $accent;
-        border-left: none;
-        border-right: none;
-    }
-
-    Input:focus {
-        background: $surface;
-        border: solid $accent;
-        border-left: none;
-        border-right: none;
-    }
-    """
+    CSS_PATH = "styles/app.tcss"
 
     BINDINGS = [
         Binding("ctrl+d", "toggle_debug", "Toggle Debug", priority=True),

@@ -44,77 +44,7 @@ class EditProposalModal(ModalScreen[dict | None]):
         Binding("escape", "cancel", "Cancel", show=True),
     ]
 
-    DEFAULT_CSS = """
-    EditProposalModal {
-        align: center middle;
-    }
-
-    #edit-container {
-        width: 80%;
-        max-width: 120;
-        height: 85%;
-        background: $surface;
-        border: thick $accent;
-        padding: 1;
-    }
-
-    #proposal-details {
-        height: 12;
-        min-height: 12;
-        background: $panel;
-        border: solid $primary;
-        padding: 1;
-        margin-bottom: 1;
-        overflow-y: auto;
-    }
-
-    #proposal-details-content {
-        width: 100%;
-        height: auto;
-    }
-
-    #chat-area {
-        height: 1fr;
-        border: solid $primary;
-        padding: 1;
-        margin-bottom: 1;
-        overflow-y: auto;
-    }
-
-    #chat-messages {
-        width: 100%;
-        height: auto;
-    }
-
-    MiniChatMessage {
-        width: 100%;
-        height: auto;
-        margin-bottom: 1;
-    }
-
-    #input-container {
-        height: auto;
-        margin-bottom: 1;
-    }
-
-    Input {
-        width: 100%;
-    }
-
-    #button-container {
-        height: auto;
-        align: center middle;
-    }
-
-    #button-container Horizontal {
-        width: auto;
-        height: auto;
-    }
-
-    #button-container Button {
-        margin: 0 2;
-    }
-    """
+    CSS_PATH = "styles/edit_proposal_modal.tcss"
 
     def __init__(
         self,

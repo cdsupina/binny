@@ -17,19 +17,7 @@ import json
 class ChatView(RichLog):
     """Scrollable chat area for displaying conversation messages."""
 
-    DEFAULT_CSS = """
-    ChatView {
-        background: $surface;
-        border: none;
-        padding: 0;
-        scrollbar-gutter: stable;
-    }
-
-    ChatView:focus {
-        border: none;
-    }
-    """
-
+    CSS_PATH = "styles/chat_view.tcss"
     can_focus = True
 
     def __init__(self, debug_enabled: bool = False):

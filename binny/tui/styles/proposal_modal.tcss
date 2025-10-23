@@ -1,0 +1,174 @@
+/* Styles for ProposalModal widget */
+
+ProposalModal {
+    align: center middle;
+    border: none;
+    outline: none;
+}
+
+#main-layout {
+    width: 100%;
+    height: 100%;
+    align: center middle;
+    padding: 0 2;
+}
+
+#proposal-container {
+    width: 50%;
+    min-width: 40;
+    height: 90%;
+    background: $surface;
+    border: round $accent;
+    padding: 1;
+}
+
+/* When reference is shown, adjust proposal container */
+ProposalModal.show-reference #main-layout {
+    align: left middle;
+}
+
+ProposalModal.show-reference #proposal-container {
+    margin-right: 2;
+}
+
+/* Reference container - hidden by default */
+#reference-container {
+    display: none;
+}
+
+/* When reference is shown, display it */
+ProposalModal.show-reference #reference-container {
+    display: block;
+    width: 50%;
+    min-width: 30;
+    max-width: 50%;
+    height: 90%;
+    margin-left: 3;
+    background: $surface;
+    border: round $accent;
+    padding: 1;
+}
+
+#reference-header {
+    width: 100%;
+    text-align: center;
+    margin-bottom: 1;
+    color: $accent;
+    height: auto;
+}
+
+#reference-markdown {
+    width: 100%;
+    height: 1fr;
+    overflow-y: auto;
+    margin-bottom: 1;
+    background: $panel;
+    padding: 1;
+}
+
+#match-counter {
+    display: none;
+    width: 100%;
+    text-align: right;
+    color: $text-muted;
+    margin-bottom: 1;
+    height: auto;
+}
+
+#reference-search {
+    display: none;
+    width: 100%;
+    margin-bottom: 0;
+    height: auto;
+}
+
+#reference-shortcuts {
+    width: 100%;
+    text-align: center;
+    color: $text-muted;
+    border-top: solid $primary;
+    padding-top: 1;
+    margin-top: 1;
+    height: auto;
+}
+
+/* Show search box and match counter when search is active */
+ProposalModal.show-search #match-counter {
+    display: block;
+}
+
+ProposalModal.show-search #reference-search {
+    display: block;
+}
+
+#proposal-header {
+    width: 100%;
+    text-align: center;
+    margin-bottom: 1;
+    color: $accent;
+}
+
+#decision-summary {
+    width: 100%;
+    height: auto;
+    text-align: center;
+    content-align: center middle;
+    margin-bottom: 1;
+    color: $text-muted;
+}
+
+#proposal-content {
+    width: 100%;
+    height: 1fr;
+    overflow-y: auto;
+    margin-bottom: 1;
+    padding: 1;
+    background: $panel;
+}
+
+#button-container {
+    width: 100%;
+    height: auto;
+    align: center middle;
+}
+
+#button-container Horizontal {
+    width: auto;
+    height: auto;
+}
+
+#button-container Button {
+    margin: 0 5;
+    min-width: 14;
+    max-width: 14;
+    content-align: center middle;
+    text-align: center;
+}
+
+#button-container Button:first-of-type {
+    margin-left: 0;
+}
+
+#button-container Button:last-of-type {
+    margin-right: 0;
+}
+
+#confirm-button {
+    content-align: center middle;
+    text-align: center;
+}
+
+.action-selected {
+    text-style: bold;
+    border: thick $accent;
+}
+
+#shortcuts-footer {
+    width: 100%;
+    height: auto;
+    text-align: center;
+    color: $text-muted;
+    border-top: solid $primary;
+    padding-top: 1;
+    margin-top: 1;
+}

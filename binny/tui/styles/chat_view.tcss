@@ -1,0 +1,12 @@
+/* Styles for ChatView widget */
+
+ChatView {
+    background: $surface;
+    border: none;
+    padding: 0;
+    scrollbar-gutter: stable;
+}
+
+ChatView:focus {
+    border: none;
+}
