@@ -18,23 +18,22 @@ Binny uses a standard Python package layout:
 
 ```
 binny/
-├── binny/                    # Main package
+├── binny/                         # Main package
 │   ├── __init__.py
-│   ├── main.py              # Entry point - launches TUI
-│   ├── cli_tools.py         # CLI utilities (arg parsing, legacy functions)
-│   ├── part_namer_tools.py  # MCP tools for part naming
-│   ├── part_namer_mcp/      # Utility library for part naming
-│   │   ├── models.py        # TypedDicts for proposals
-│   │   └── file_manager.py  # File I/O for prefixes/materials
-│   ├── tui/                 # Textual TUI components
+│   ├── main.py                    # Entry point - launches TUI
+│   ├── part_namer_tools.py        # MCP tools for part naming
+│   ├── part_namer_mcp/            # Utility library for part naming
+│   │   ├── models.py              # TypedDicts for proposals
+│   │   └── file_manager.py        # File I/O for prefixes/materials
+│   ├── tui/                       # Textual TUI components
 │   │   ├── __init__.py
-│   │   ├── app.py           # Main TUI application
-│   │   ├── status_bar.py    # Pending proposal status
-│   │   ├── chat_view.py     # Message display
-│   │   └── proposal_modal.py # Approval modal dialog
-│   └── system_prompts/      # Agent system prompts
-├── .claude/                 # Slash commands
-└── pyproject.toml          # Package configuration with entry point
+│   │   ├── app.py                 # Main TUI application
+│   │   ├── chat_view.py           # Message display
+│   │   ├── proposal_modal.py      # Approval modal dialog
+│   │   └── edit_proposal_modal.py # Edit proposal with mini-chat
+│   └── system_prompts/            # Agent system prompts
+├── .claude/                       # Slash commands
+└── pyproject.toml                # Package configuration with entry point
 ```
 
 ### Main Agent Structure (binny/main.py)
@@ -54,17 +53,18 @@ System prompts are loaded from `system_prompts/` directory:
 - `part_namer_prompt.md` - part naming agent prompt
 - `mmc_searcher_prompt.md` - McMaster-Carr search agent prompt
 - `inventory_manager_prompt.md` - inventory management agent prompt
+- `edit_assistant_prompt.md` - proposal editing assistant prompt
 
 ### TUI Interface (binny/tui/)
 
 Provides Textual-based Terminal User Interface with:
 
-- **Status Bar** (`status_bar.py`): Shows pending proposal count, clickable to
-  review
 - **Chat View** (`chat_view.py`): Scrollable message display with Rich
   formatting
 - **Proposal Modal** (`proposal_modal.py`): Interactive approval dialog with
-  Approve/Reject/Edit/Defer buttons
+  Approve/Reject/Edit/Defer buttons and batch review support
+- **Edit Proposal Modal** (`edit_proposal_modal.py`): Dedicated modal with
+  mini-chat for collaborative proposal editing
 - **Main App** (`app.py`): Async integration with Claude SDK, deterministic
   proposal handling
 
@@ -81,7 +81,6 @@ Features:
   - `Ctrl+Y`: Copy last assistant response to clipboard
   - `Ctrl+L`: Copy entire chat to clipboard
 - Clipboard support via OSC 52 escape sequences (works in most modern terminals)
-- Clickable status bar to trigger proposal review
 - Deterministic approval workflow (no agent interpretation)
 
 ## Development Commands
@@ -137,7 +136,7 @@ Build system: `hatchling` (configured in `[build-system]` section of pyproject.t
 - `MCMASTER_CERT_PATH` - path to McMaster-Carr certificate file (.pfx)
 - `MCMASTER_CERT_PASSWORD` - certificate password
 
-Environment variables are loaded via `python-dotenv` in main.py:12
+Environment variables are loaded via `python-dotenv` in `main.py`
 
 ### Part Namer MCP Server
 
@@ -186,8 +185,8 @@ Prefixes and materials are stored as H2 headers with structured fields:
 **TUI Review:**
 
 - Keyboard shortcut `Ctrl+R` triggers proposal review
-- Clicking status bar when proposals are pending triggers review
 - Interactive modals for each proposal with button navigation
+- Batch review mode with decision summary
 
 ## Agent SDK Integration
 
@@ -197,7 +196,7 @@ The application uses Claude Agent SDK's async client pattern:
    definitions
 2. Create `ClaudeSDKClient` context manager
 3. Loop: get user input → `client.query()` → iterate `client.receive_response()`
-4. Parse and display messages using Rich console
+4. Parse and display messages in the TUI using Textual widgets
 
 Sub-agents are registered in the `agents` dict of `ClaudeAgentOptions` in
 `binny/main.py`, each with description, prompt, and model specification.
