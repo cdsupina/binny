@@ -76,6 +76,7 @@ Features:
   tool_result/magenta, system/cyan)
 - JSON syntax highlighting for tool results
 - Debug mode (`--debug` or `-d` flag) to show tool use and tool results
+- Dev mode (`--dev` flag) enables live CSS reloading for UI development
 - Keyboard shortcuts:
   - `Ctrl+C`: Quit
   - `Ctrl+D`: Toggle Debug
@@ -89,10 +90,26 @@ Features:
 
 ### Running the Application
 
-**Development mode:**
+**Normal mode:**
 ```bash
 uv run binny
 ```
+
+**Debug mode (shows tool use and tool results):**
+```bash
+uv run binny --debug
+```
+
+**Dev mode (enables live CSS reloading):**
+```bash
+uv run binny --dev
+```
+
+Dev mode uses Textual's built-in CSS hot-reloading feature. When enabled:
+- Any changes to `.tcss` files are automatically detected and applied
+- Styles update in real-time without restarting the app
+- App state is preserved during CSS reloads
+- Implemented via `TEXTUAL` environment variable with `debug` and `devtools` features
 
 **Installed with uv tool:**
 ```bash
@@ -103,11 +120,6 @@ binny
 **Reinstall after making changes:**
 ```bash
 uv tool install --reinstall .
-```
-
-**Debug mode:**
-```bash
-uv run binny --debug
 ```
 
 ### Dependencies

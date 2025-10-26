@@ -11,8 +11,18 @@ inventory_dir = os.getenv("BINNY_INVENTORY_DIR")
 # Parse CLI arguments and set debug mode
 parser = argparse.ArgumentParser()
 parser.add_argument("--debug", "-d", action="store_true", help="Enable debug mode")
+parser.add_argument("--dev", action="store_true", help="Enable development mode (live CSS reloading)")
 args = parser.parse_args()
 debug_enabled = args.debug
+dev_mode = args.dev
+
+# Enable Textual dev mode via TEXTUAL environment variable
+if dev_mode:
+    from textual.features import parse_features
+    features = set(parse_features(os.environ.get("TEXTUAL", "")))
+    features.add("debug")
+    features.add("devtools")
+    os.environ["TEXTUAL"] = ",".join(sorted(features))
 
 
 async def async_main():
@@ -55,6 +65,7 @@ async def async_main():
         edit_assistant_system_prompt=edit_assistant_system_prompt,
         inventory_dir=inventory_dir,
         debug_enabled=debug_enabled,
+        dev_mode=dev_mode,
     )
 
     # Redirect stderr during shutdown to suppress asyncio warnings

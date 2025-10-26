@@ -74,7 +74,7 @@ from naming physical parts to tracking inventory files.
 
 ## Usage
 
-Run the application in development mode:
+Run the application:
 
 ```bash
 uv run binny
@@ -84,6 +84,12 @@ Run with debug mode (shows tool usage and session statistics):
 
 ```bash
 uv run binny --debug
+```
+
+Run with dev mode (enables live CSS reloading for UI development):
+
+```bash
+uv run binny --dev
 ```
 
 Or install as a global tool:

@@ -56,6 +56,7 @@ class BinnyApp(App):
         edit_assistant_system_prompt: str,
         inventory_dir: str,
         debug_enabled: bool = False,
+        dev_mode: bool = False,
     ):
         super().__init__()
         self.binny_system_prompt = binny_system_prompt
@@ -65,6 +66,7 @@ class BinnyApp(App):
         self.edit_assistant_system_prompt = edit_assistant_system_prompt
         self.inventory_dir = inventory_dir
         self.debug_enabled = debug_enabled
+        self.dev_mode = dev_mode
         self.client = None
         self.pending_proposals = []
 
@@ -169,6 +171,10 @@ class BinnyApp(App):
 
         # Show welcome message
         chat_view = self.query_one(ChatView)
+        dev_mode_msg = ""
+        if self.dev_mode:
+            dev_mode_msg = "\n\n🔧 DEV MODE: Live CSS reloading enabled - edit .tcss files and see changes instantly!"
+
         chat_view.add_system_message(
             "Welcome to Binny! I'm ready to help with inventory management, part naming, and McMaster-Carr lookups.\n\n"
             "Type your message below and press Enter to chat.\n\n"
@@ -179,6 +185,7 @@ class BinnyApp(App):
             "  • Ctrl+C: Quit\n"
             "  • Ctrl+D: Toggle debug mode\n"
             "  • Ctrl+R: Review pending proposals"
+            f"{dev_mode_msg}"
         )
 
         # Focus the input field
