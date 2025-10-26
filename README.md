@@ -92,6 +92,28 @@ Run with dev mode (enables live CSS reloading for UI development):
 uv run binny --dev
 ```
 
+### Using the Dev Console
+
+For advanced debugging with print statements and logs visible in a separate terminal:
+
+**Terminal 1 - Start the console:**
+```bash
+uv run textual console
+```
+
+**Terminal 2 - Run the app:**
+```bash
+uv run textual run --dev -c binny
+```
+
+The dev console shows:
+- All `print()` statements from your app
+- Textual internal logs
+- Python logging output
+- Event messages
+
+**Note:** `uv run binny --dev` enables CSS hot-reloading only. Use `textual run --dev -c binny` to connect to the dev console (which also includes CSS hot-reloading).
+
 Or install as a global tool:
 
 ```bash

@@ -111,6 +111,42 @@ Dev mode uses Textual's built-in CSS hot-reloading feature. When enabled:
 - App state is preserved during CSS reloads
 - Implemented via `TEXTUAL` environment variable with `debug` and `devtools` features
 
+**Using the Textual Dev Console:**
+
+For advanced debugging with a separate terminal showing print/log output:
+
+Terminal 1 (start the console):
+```bash
+uv run textual console
+```
+
+Terminal 2 (run the app):
+```bash
+uv run textual run --dev -c binny
+```
+
+The console displays:
+- All `print()` output from the application
+- Textual framework logs and events
+- Python logging statements
+- Custom debug messages
+
+Optional console flags:
+- `-v` - Show verbose/debug events
+- `-x EVENT,DEBUG` - Exclude specific message types
+- `--port 7342` - Use custom port (must match in both commands)
+
+Example with custom port:
+```bash
+# Terminal 1
+uv run textual console --port 7342
+
+# Terminal 2
+uv run textual run --dev --port 7342 -c binny
+```
+
+**Note:** The `--dev` flag on `uv run binny --dev` enables CSS reloading only. To connect to the dev console, use `textual run --dev -c binny` (which also includes CSS reloading).
+
 **Installed with uv tool:**
 ```bash
 uv tool install .

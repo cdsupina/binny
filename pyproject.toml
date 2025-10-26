@@ -12,6 +12,11 @@ dependencies = [
     "textual>=0.95.0",
 ]
 
+[project.optional-dependencies]
+dev = [
+    "textual-dev>=1.0.0",
+]
+
 [project.scripts]
 binny = "binny.main:main"
 
